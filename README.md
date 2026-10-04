@@ -1,4 +1,4 @@
-# T10X Batarya & Şarj Takip v0.8.1
+# T10X Batarya & Şarj Takip v0.8.2
 
 Bu sürüm Firebase Web App yapılandırması işlenmiş, GitHub Pages'e yüklemeye hazır sürümdür.
 
@@ -30,3 +30,9 @@ Analytics zorunlu değildir; uygulamanın çalışma mantığı Authentication +
 ## GitHub Pages
 Repo köküne bu klasörün içindeki dosyaları yükleyin.
 Settings > Pages > Deploy from a branch > `main` / `(root)` seçin.
+
+### v0.8.2 tek kullanıcı giriş modeli
+- Ana uygulama Firebase Authentication oturumu olmadan görünmez.
+- Uygulama içinde kullanıcı kaydı/üyelik oluşturma yoktur.
+- Kullanıcı Firebase Console > Authentication > Users üzerinden yönetilir.
+- `database.rules.single-user.template.json` ile veritabanı tek User UID'ye kilitlenebilir.

@@ -3,7 +3,6 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.19.0/fireba
 import {
   getAuth,
   onAuthStateChanged,
-  createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
   setPersistence,
@@ -25,7 +24,9 @@ const ui = {
   form: $('cloudAuthForm'),
   email: $('cloudEmail'),
   password: $('cloudPassword'),
-  register: $('cloudRegisterBtn'),
+  gate: $('authGate'),
+  shell: $('appShell'),
+  gateMessage: $('authGateMessage'),
   signout: $('cloudSignOutBtn'),
   info: $('cloudUserInfo'),
   upload: $('cloudUploadBtn'),
@@ -83,14 +84,22 @@ function setStatus(mode, label, detail = '') {
 
 function setSignedInUi(user) {
   const signed = Boolean(user);
-  if (ui.email) ui.email.disabled = signed;
-  if (ui.password) ui.password.disabled = signed;
-  const submit = ui.form?.querySelector('button[type="submit"]');
-  if (submit) submit.hidden = signed;
-  if (ui.register) ui.register.hidden = signed;
-  if (ui.signout) ui.signout.hidden = !signed;
   if (ui.upload) ui.upload.disabled = !signed || !cloudReady;
   if (ui.download) ui.download.disabled = !signed || !cloudReady;
+  if (ui.signout) ui.signout.hidden = !signed;
+  if (ui.info) ui.info.textContent = signed
+    ? `${user.email || 'Hesap'} · oturum açık.`
+    : 'Oturum kapalı.';
+}
+
+function setGate(locked, text = '', kind = 'info') {
+  if (ui.gate) ui.gate.hidden = !locked;
+  if (ui.shell) ui.shell.hidden = locked;
+  document.body.classList.toggle('auth-locked', locked);
+  if (ui.gateMessage && text) {
+    ui.gateMessage.textContent = text;
+    ui.gateMessage.className = `auth-message${kind === 'error' ? ' error' : kind === 'success' ? ' success' : ''}`;
+  }
 }
 
 function message(text, kind = 'info') {
@@ -182,6 +191,7 @@ async function connectUser(user) {
   currentUser = user;
   cloudReady = false;
   setSignedInUi(user);
+  setGate(true, `${user.email || 'Hesap'} · bulut verisi hazırlanıyor…`);
   setStatus('connecting', 'Bağlanıyor', `${user.email || 'Hesap'} · bulut verisi kontrol ediliyor…`);
   currentRef = ref(rtdb, `users/${user.uid}/appData`);
 
@@ -190,6 +200,7 @@ async function connectUser(user) {
     cloudReady = true;
     setSignedInUi(user);
     setStatus('online', 'Senkron', `${user.email || 'Hesap'} · Firebase senkronizasyonu açık.`);
+    setGate(false);
 
     if (unsubscribeRemote) unsubscribeRemote();
     unsubscribeRemote = onValue(currentRef, snap => {
@@ -211,6 +222,7 @@ async function connectUser(user) {
     lastError = friendlyError(err);
     setSignedInUi(user);
     setStatus('error', 'Hata', lastError);
+    setGate(true, `Giriş başarılı ancak bulut verisine erişilemedi: ${lastError}`, 'error');
     message(lastError, 'error');
   }
 }
@@ -222,7 +234,8 @@ function disconnectUser() {
   if (unsubscribeRemote) unsubscribeRemote();
   unsubscribeRemote = null;
   setSignedInUi(null);
-  setStatus('local', 'Local', 'Bulut hesabına giriş yapılmadı. Local veriler kullanılmaya devam ediyor.');
+  setStatus('local', 'Kilitli', 'Giriş yapılmadı.');
+  setGate(true, 'Bu uygulama yalnızca yetkili kullanıcı için açıktır. Firebase hesabınızla giriş yapın.');
 }
 
 window.addEventListener('t10x:data-changed', event => {
@@ -233,15 +246,17 @@ window.addEventListener('t10x:data-changed', event => {
 });
 
 if (!configured()) {
-  setStatus('local', 'Local');
+  setStatus('error', 'Yapılandırma');
   setSignedInUi(null);
-  message('Firebase henüz yapılandırılmadı. SETUP_FIREBASE_GITHUB.md adımlarını uygulayıp firebase-config.js dosyasını doldurun. Uygulama local modda çalışmaya devam eder.');
+  setGate(true, 'Firebase yapılandırması bulunamadı. firebase-config.js dosyasını kontrol edin.', 'error');
+  message('Firebase yapılandırması bulunamadı. firebase-config.js dosyasını kontrol edin.', 'error');
   if (ui.form) ui.form.querySelectorAll('input,button').forEach(el => el.disabled = true);
   if (ui.upload) ui.upload.disabled = true;
   if (ui.download) ui.download.disabled = true;
 } else {
   try {
-    message('Firebase yapılandırması hazır. E-posta/şifre ile giriş yaptığınızda local verileriniz UID'nize ait özel alana senkronize edilir.');
+    setGate(true, 'Oturum kontrol ediliyor…');
+    message('Firebase yapılandırması hazır. Uygulama yalnızca giriş yapıldıktan sonra açılır.');
     const app = initializeApp(firebaseConfig);
     auth = getAuth(app);
     rtdb = getDatabase(app);
@@ -255,30 +270,21 @@ if (!configured()) {
       e.preventDefault();
       try {
         setStatus('connecting', 'Giriş', 'Firebase hesabına giriş yapılıyor…');
+        setGate(true, 'Giriş yapılıyor…');
         await signInWithEmailAndPassword(auth, ui.email.value.trim(), ui.password.value);
         ui.password.value = '';
       } catch (err) {
         const text = friendlyError(err);
         setStatus('error', 'Hata', text);
+        setGate(true, text, 'error');
         message(text, 'error');
       }
     });
 
-    ui.register?.addEventListener('click', async () => {
-      try {
-        const email = ui.email.value.trim(), password = ui.password.value;
-        if (!email || password.length < 6) return message('Hesap oluşturmak için geçerli e-posta ve en az 6 karakter şifre girin.', 'error');
-        setStatus('connecting', 'Kayıt', 'Firebase hesabı oluşturuluyor…');
-        await createUserWithEmailAndPassword(auth, email, password);
-        ui.password.value = '';
-      } catch (err) {
-        const text = friendlyError(err);
-        setStatus('error', 'Hata', text);
-        message(text, 'error');
-      }
+    ui.signout?.addEventListener('click', async () => {
+      setGate(true, 'Oturum kapatılıyor…');
+      await signOut(auth);
     });
-
-    ui.signout?.addEventListener('click', () => signOut(auth));
 
     ui.upload?.addEventListener('click', async () => {
       if (!currentUser) return;
@@ -303,6 +309,7 @@ if (!configured()) {
   } catch (err) {
     const text = friendlyError(err);
     setStatus('error', 'Hata', text);
+    setGate(true, `Firebase başlatılamadı: ${text}`, 'error');
     message(`Firebase başlatılamadı: ${text}`, 'error');
   }
 }

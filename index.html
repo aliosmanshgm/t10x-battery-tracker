@@ -9,10 +9,30 @@
   <meta name="apple-mobile-web-app-title" content="T10X Batarya" />
   <meta name="mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="manifest.webmanifest" />
-  <title>T10X Batarya & Şarj Takip v0.8.1</title>
+  <title>T10X Batarya & Şarj Takip v0.8.2</title>
   <link rel="stylesheet" href="app.css" />
 </head>
 <body>
+  <section id="authGate" class="auth-gate" aria-live="polite">
+    <div class="auth-card">
+      <div class="auth-brand">
+        <span class="auth-icon">T10X</span>
+        <div>
+          <h1>Batarya & Şarj Takip</h1>
+          <p>Kişisel kullanım · Firebase ile güvenli senkronizasyon</p>
+        </div>
+      </div>
+      <div id="authGateMessage" class="auth-message">Giriş bilgilerinizi girin.</div>
+      <form id="cloudAuthForm" class="auth-login-form">
+        <label>E-posta<input id="cloudEmail" type="email" autocomplete="username" inputmode="email" required placeholder="e-posta adresiniz"></label>
+        <label>Şifre<input id="cloudPassword" type="password" autocomplete="current-password" minlength="6" required placeholder="şifreniz"></label>
+        <button id="cloudSignInBtn" type="submit">Giriş Yap</button>
+      </form>
+      <p class="auth-help">Bu uygulamada üyelik oluşturma kapalıdır. Kullanıcı hesabı yalnızca Firebase Console üzerinden tanımlanır.</p>
+    </div>
+  </section>
+
+  <div id="appShell" hidden>
   <header class="topbar">
     <div>
       <h1>T10X Batarya & Şarj Takip</h1>
@@ -286,17 +306,13 @@
       <div class="form-card cloud-settings">
         <div class="card-head"><div><h2>Firebase Bulut Senkronizasyonu</h2><p class="muted">GitHub Pages üzerinden iPhone ve diğer cihazlarda aynı veriye güvenli erişim.</p></div><span id="cloudStatusBadge" class="badge neutral">Local</span></div>
         <div id="cloudSetupMessage" class="info-box">Firebase bağlantısı yapılandırıldı. E-posta/şifre ile giriş yaparak bulut senkronizasyonunu başlatabilirsiniz.</div>
-        <form id="cloudAuthForm" class="cloud-auth-form">
-          <label>E-posta<input id="cloudEmail" type="email" autocomplete="email" placeholder="ornek@email.com"></label>
-          <label>Şifre<input id="cloudPassword" type="password" autocomplete="current-password" minlength="6" placeholder="En az 6 karakter"></label>
-          <div class="cloud-auth-actions"><button id="cloudSignInBtn" type="submit">Giriş Yap</button><button id="cloudRegisterBtn" type="button" class="secondary">Hesap Oluştur</button><button id="cloudSignOutBtn" type="button" class="secondary" hidden>Çıkış Yap</button></div>
-        </form>
-        <div id="cloudUserInfo" class="cloud-user-info muted">Bulut hesabına giriş yapılmadı.</div>
+        <div id="cloudUserInfo" class="cloud-user-info muted">Oturum bilgisi yükleniyor…</div>
+        <div class="cloud-auth-actions account-actions"><button id="cloudSignOutBtn" type="button" class="secondary">Çıkış Yap</button></div>
         <div class="cloud-sync-actions">
           <button id="cloudUploadBtn" type="button" class="secondary" disabled>Bu Cihazdaki Veriyi Buluta Gönder</button>
           <button id="cloudDownloadBtn" type="button" class="secondary" disabled>Buluttaki Veriyi Bu Cihaza Al</button>
         </div>
-        <p class="muted">Uygulama local-first çalışır. Giriş yaptıktan sonra değişiklikler Firebase Realtime Database altında yalnızca sizin kullanıcı kimliğinizle eşleşen alana senkronize edilir. JSON yedeği almaya devam etmeniz önerilir.</p>
+        <p class="muted">Uygulamaya erişim Firebase girişi gerektirir. Giriş yaptıktan sonra değişiklikler Realtime Database altında yalnızca sizin kullanıcı kimliğinizle eşleşen alana senkronize edilir. Cihazda local kopya çevrimdışı dayanıklılık için tutulur; JSON yedeği almaya devam etmeniz önerilir.</p>
       </div>
 
       <div class="form-card provider-settings">
@@ -307,7 +323,9 @@
     </section>
   </main>
 
-  <footer>v0.8.1 · Firebase yapılandırıldı · Local-first + Firebase Sync · GitHub Pages hazır · iPhone uyumlu · km/SOC eksik geçmiş kayıt desteği · süre→ortalama güç/C-rate</footer>
+  <footer>v0.8.2 · Tek kullanıcı giriş kapısı · Firebase Sync · GitHub Pages · iPhone uyumlu · km/SOC eksik geçmiş kayıt desteği · süre→ortalama güç/C-rate</footer>
+  </div>
+
   <script src="app.js"></script>
   <script type="module" src="firebase-sync.js"></script>
   <script>

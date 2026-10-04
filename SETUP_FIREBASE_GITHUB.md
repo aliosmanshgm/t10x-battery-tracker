@@ -1,4 +1,4 @@
-# Firebase + GitHub Pages Kurulum Kontrol Listesi — v0.8.1
+# Firebase + GitHub Pages Kurulum Kontrol Listesi — v0.8.2
 
 ## 1. Tamamlananlar
 - Firebase projesi: `t10x-battery-tracker`
@@ -53,3 +53,17 @@ Senkronizasyon doğrulandıktan sonra Safari Paylaş > Ana Ekrana Ekle ile PWA g
 
 ## 9. Veri güvenliği
 Firebase web config istemci tarafında görünür. Gerçek erişim kontrolü Authentication + Realtime Database Security Rules ile sağlanır.
+
+## Tek kullanıcı modu (v0.8.2)
+
+Bu sürümde uygulama giriş yapılmadan açılmaz ve web arayüzünde **Hesap Oluştur** seçeneği yoktur.
+
+1. Firebase Console > Authentication > Users bölümüne gidin.
+2. **Add user / Kullanıcı ekle** ile yalnızca kendi e-posta adresiniz ve bir şifre oluşturun.
+3. Oluşan kullanıcının **User UID** değerini kopyalayın.
+4. Realtime Database > Rules bölümünde `database.rules.single-user.template.json` dosyasını kullanın.
+5. Dosyadaki `OWNER_UID_HERE` ifadesini kendi User UID değerinizle değiştirip Publish edin.
+
+Bu kural, veritabanını yalnızca o UID'ye kilitler. Başka bir Firebase hesabı oluşturulsa dahi T10X veritabanını okuyamaz veya yazamaz.
+
+GitHub'a v0.8.2 dosyalarını yükledikten sonra önceki service worker önbelleği nedeniyle eski ekranı görürseniz sayfayı yenileyin. Ana ekrana eklenmiş iPhone sürümünde uygulamayı tamamen kapatıp yeniden açmak da yeni service worker'ın devreye girmesini hızlandırır.
