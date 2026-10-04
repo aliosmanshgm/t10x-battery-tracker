@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="theme-color" content="#101828" />
+  <meta name="apple-mobile-web-app-title" content="T10X Batarya" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <title>T10X Batarya & Şarj Takip v0.8.1</title>
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>T10X Batarya & Şarj Takip</h1>
+      <p>NMC odaklı local takip · Sağlık Skoru · SOH · SOC · C-rate · AC/DC denge önerileri</p>
+    </div>
+    <div class="top-actions">
+      <span id="cloudStatusPill" class="cloud-pill local">Bulut: Local</span>
+      <button id="exportJsonBtn" class="secondary">JSON Yedekle</button>
+      <label class="button secondary file-label">JSON Geri Yükle<input id="importJsonInput" type="file" accept="application/json" hidden></label>
+    </div>
+  </header>
+
+  <nav class="tabs" aria-label="Ana bölümler">
+    <button class="tab active" data-tab="dashboard">Gösterge Paneli</button>
+    <button class="tab" data-tab="charges">Şarj Kayıtları</button>
+    <button class="tab" data-tab="trips">Tüketim / Sürüş</button>
+    <button class="tab" data-tab="soh">SOH Testleri</button>
+    <button class="tab" data-tab="crate">C-rate Simülatörü</button>
+    <button class="tab" data-tab="analytics">Analizler</button>
+    <button class="tab" data-tab="knowledge">Bilgi / Bilimsel Dayanak</button>
+    <button class="tab" data-tab="settings">Ayarlar</button>
+  </nav>
+
+  <main>
+    <section id="dashboard" class="panel active">
+      <div class="cards" id="dashboardCards"></div>
+      <div class="grid two">
+        <article class="card health-score-card">
+          <div class="card-head"><h2>Batarya Sağlık Skoru</h2><span id="healthConfidence" class="badge neutral"></span></div>
+          <div class="health-score-wrap">
+            <div id="healthScoreGauge" class="score-gauge"><span id="healthScoreValue">—</span><small>/100</small></div>
+            <div id="healthScoreSummary" class="health-summary"></div>
+          </div>
+          <div id="healthScoreComponents" class="score-components"></div>
+          <p class="muted">Bu skor BMS tarafından ölçülen SOH değildir; ölçülen SOH, SOC disiplini ve şarj stresi verilerinden oluşturulan açıklanabilir bir takip göstergesidir.</p>
+        </article>
+        <article class="card">
+          <div class="card-head"><h2>Sahiplik Dönemi</h2></div>
+          <div id="ownershipSummary"></div>
+        </article>
+      </div>
+      <div class="grid two">
+        <article class="card consumption-card">
+          <div class="card-head"><h2>Ortalama Tüketim</h2><button class="link-btn" data-goto="trips">Kayıt Ekle</button></div>
+          <div id="consumptionSummary"></div>
+        </article>
+        <article class="card">
+          <div class="card-head"><h2>Güncel Araç Durumu</h2></div>
+          <form id="quickStatusForm" class="quick-status-form">
+            <label>Kilometre<input id="quickCurrentOdo" type="number" min="0" step="1"></label>
+            <label>SOC (%)<input id="quickCurrentSoc" type="number" min="0" max="100" step="1"></label>
+            <button type="submit">Durumu Güncelle</button>
+          </form>
+        </article>
+      </div>
+      <div class="grid two">
+        <article class="card recommendation-card">
+          <div class="card-head"><h2>Akıllı Şarj Önerisi</h2><span id="recommendationBadge" class="badge"></span></div>
+          <div id="smartRecommendation"></div>
+        </article>
+        <article class="card">
+          <div class="card-head"><h2>20–80 Uyum Özeti</h2></div>
+          <div id="complianceSummary"></div>
+        </article>
+      </div>
+      <div class="grid two">
+        <article class="card"><div class="card-head"><h2>Son Şarjlar</h2><button class="link-btn" data-goto="charges">Tümü</button></div><div id="recentCharges"></div></article>
+        <article class="card"><h2>Şarj Türü Dağılımı</h2><div id="chargeTypeBars"></div></article>
+      </div>
+      <div class="grid two">
+        <article class="card"><h2>Sağlayıcı Dağılımı</h2><div id="providerBars"></div></article>
+        <article class="card"><h2>C-rate Özeti</h2><div id="crateSummary"></div></article>
+      </div>
+    </section>
+
+    <section id="charges" class="panel">
+      <div class="section-title">
+        <div><h2>Şarj Kayıtları</h2><p>AC/DC, sağlayıcı, SOC aralığı, enerji, maliyet ve C-rate takibi.</p></div>
+        <button id="exportChargesCsv" class="secondary">CSV Dışa Aktar</button>
+      </div>
+
+      <div class="info-box"><strong>Geçmiş kayıtlar kilometre ve SOC bilgisi olmadan da eklenebilir.</strong> 32.356–33.537 km arasındaki eski şarjlarınızda kilometre veya başlangıç/bitiş SOC bilinmiyorsa alanları boş bırakabilirsiniz. AC/DC, enerji, süre, sağlayıcı ve maliyet gibi bilinen veriler analizlere dahil edilir. SOC bilinmeyen kayıtlar %20–80 uyum hesabından otomatik olarak hariç tutulur; yanlışlıkla uygunsuz sayılmaz.</div>
+      <form id="chargeForm" class="form-card">
+        <input type="hidden" id="chargeId">
+        <div class="form-grid">
+          <label>Tarih / Saat<input id="chargeDate" type="datetime-local" required></label>
+          <label>Kilometre <span class="muted">(opsiyonel geçmiş kayıtta)</span><input id="chargeOdo" type="number" min="0" step="1" placeholder="Örn. 33537"></label>
+          <label class="checkbox-label"><input id="chargeOdoUnknown" type="checkbox"> Geçmiş kayıtta kilometre bilgim yok</label>
+          <label>Başlangıç SOC (%) <span class="muted">(opsiyonel geçmiş kayıtta)</span><input id="chargeStartSoc" type="number" min="0" max="100" step="1" placeholder="Bilinmiyorsa boş bırakın"></label>
+          <label>Bitiş SOC (%) <span class="muted">(opsiyonel geçmiş kayıtta)</span><input id="chargeEndSoc" type="number" min="0" max="100" step="1" placeholder="Bilinmiyorsa boş bırakın"></label>
+          <label>Şarj Türü<select id="chargeType"><option>AC</option><option>DC</option></select></label>
+          <label>Kayıt Dönemi<select id="chargeScope"><option value="owner_current">Benim kullanımım · güncel</option><option value="owner_history">Benim kullanımım · geçmiş kayıt</option><option value="previous_owner">Önceki sahip · geçmiş kayıt</option></select></label>
+          <label>İstasyondan Alınan Enerji (kWh)<input id="chargeEnergy" type="number" min="0" step="0.01" placeholder="Örn. 42.6"></label>
+          <label>Şarj Süresi (dk)<input id="chargeDuration" type="number" min="0" step="1" placeholder="Örn. 27"></label>
+          <label>Maksimum Görülen Güç (kW) · Opsiyonel<input id="chargePower" type="number" min="0" step="0.1" placeholder="Örn. 176"></label>
+          <label>Sağlayıcı<input id="chargeProvider" list="providerList" placeholder="Trugo, Neva, Zes..."></label>
+          <datalist id="providerList"><option value="Trugo"><option value="Neva"><option value="Zes"><option value="Eşarj"><option value="Sharz.net"><option value="Voltrun"><option value="Ev / Kendi AC Şarjım"></datalist>
+          <label>Maliyet (₺)<input id="chargeCost" type="number" min="0" step="0.01"></label>
+          <label>Ortam Sıcaklığı (°C)<input id="chargeTemp" type="number" step="0.1"></label>
+          <label class="span-2">Konum / İstasyon<input id="chargeLocation" type="text" placeholder="Örn. Ankara - Trugo Söğütözü"></label>
+          <label class="span-2">Not<textarea id="chargeNotes" rows="2"></textarea></label>
+        </div>
+        <div id="chargePreview" class="calculation-preview"></div>
+        <div class="info-box"><strong>Eksik geçmiş veri mantığı:</strong> Enerji + süre varsa SOC bilinmese bile ortalama güç ve C-rate hesaplanır. SOC verisi olan oturumlar ayrıca %20–80 disiplinine katılır. Böylece eski, eksik kayıtlar korunur fakat bilmediğimiz SOC değerleri varsayılmaz.<br><br><strong>Güç hesabı:</strong> Ortalama şarj gücü = istasyondan alınan enerji (kWh) ÷ şarj süresi (saat). Maksimum görülen güç opsiyoneldir ve tepe C-rate olarak ayrıca izlenir.</div>
+        <div class="form-actions"><button type="submit">Kaydet</button><button type="button" id="chargeReset" class="secondary">Temizle</button></div>
+      </form>
+      <div class="table-wrap"><table><thead><tr><th>Tarih</th><th>Km</th><th>SOC</th><th>Tür</th><th>Dönem</th><th>Süre</th><th>Ort. Güç</th><th>Maks.</th><th>C-rate</th><th>Enerji</th><th>Sağlayıcı</th><th>₺</th><th>20–80</th><th></th></tr></thead><tbody id="chargesTable"></tbody></table></div>
+    </section>
+
+    <section id="trips" class="panel">
+      <div class="section-title"><div><h2>Tüketim / Sürüş Kayıtları</h2><p>Son şarjdan beri ve sahiplik dönemi ortalamalarını, ayrıca ayrıntılı sürüşleri takip edin.</p></div><div class="section-actions"><button id="exportConsumptionCsv" class="secondary">Tüketim CSV</button><button id="exportTripsCsv" class="secondary">Sürüş CSV</button></div></div>
+      <div class="info-box"><strong>İki ayrı tüketim göstergesi:</strong> Araç ekranındaki “son şarjdan beri” ve “toplam/sahiplik dönemi” kWh/100 km değerlerini aşağıdaki sayaç kaydına birlikte girin. Örneğin <strong>18,0 kWh/100 km</strong>. Bu değerler zaman içindeki değişimi izlemek için saklanır.</div>
+      <form id="consumptionForm" class="form-card">
+        <input type="hidden" id="consumptionId">
+        <h2>Tüketim Sayaç Kaydı</h2>
+        <div class="form-grid compact-grid">
+          <label>Tarih / Saat<input id="consumptionDate" type="datetime-local" required></label>
+          <label>Kilometre<input id="consumptionOdo" type="number" min="0" step="1" required></label>
+          <label>Son Şarjdan Beri Ort. (kWh/100 km)<input id="consumptionSinceCharge" type="number" min="0" step="0.1" placeholder="18.0" required></label>
+          <label>Sahiplik Dönemi Toplam Ort. (kWh/100 km)<input id="consumptionTotal" type="number" min="0" step="0.1" placeholder="18.0" required></label>
+          <label class="span-2">Not<input id="consumptionNotes" type="text" placeholder="Örn. şehir içi ağırlıklı / kış kullanımı"></label>
+        </div>
+        <div class="form-actions"><button type="submit">Tüketim Kaydını Kaydet</button><button type="button" id="consumptionReset" class="secondary">Temizle</button></div>
+      </form>
+      <div class="table-wrap"><table><thead><tr><th>Tarih</th><th>Km</th><th>Son Şarjdan Beri</th><th>Toplam Ortalama</th><th>Not</th><th></th></tr></thead><tbody id="consumptionTable"></tbody></table></div>
+
+      <h3 class="subsection-title">Ayrıntılı Sürüş Kayıtları</h3>
+      <form id="tripForm" class="form-card">
+        <input type="hidden" id="tripId">
+        <div class="form-grid">
+          <label>Tarih<input id="tripDate" type="date" required></label>
+          <label>Mesafe (km)<input id="tripDistance" type="number" min="0" step="0.1" required></label>
+          <label>Ortalama Tüketim (kWh/100 km)<input id="tripConsumption" type="number" min="0" step="0.1" required></label>
+          <label>Başlangıç SOC (%)<input id="tripStartSoc" type="number" min="0" max="100" step="1"></label>
+          <label>Bitiş SOC (%)<input id="tripEndSoc" type="number" min="0" max="100" step="1"></label>
+          <label>Ortam Sıcaklığı (°C)<input id="tripTemp" type="number" step="0.1"></label>
+          <label class="span-2">Rota / Açıklama<input id="tripRoute" type="text" placeholder="Örn. Ankara şehir içi / Ankara-İstanbul"></label>
+          <label class="span-2">Not<textarea id="tripNotes" rows="2"></textarea></label>
+        </div>
+        <div class="form-actions"><button type="submit">Kaydet</button><button type="button" id="tripReset" class="secondary">Temizle</button></div>
+      </form>
+      <div class="table-wrap"><table><thead><tr><th>Tarih</th><th>Mesafe</th><th>Tüketim</th><th>Enerji</th><th>SOC</th><th>Rota</th><th></th></tr></thead><tbody id="tripsTable"></tbody></table></div>
+    </section>
+
+    <section id="soh" class="panel">
+      <div class="info-box">
+        <strong>SOH burada saha tahminidir.</strong> SOC farkı üzerinden bataryaya giden net enerji ölçeklenerek kapasite tahmin edilir. Geniş SOC aralığı, AC şarj ve ılımlı sıcaklık sonucu daha güvenilir yapar; BMS/servis ölçümü referans olmaya devam eder.
+      </div>
+      <form id="sohForm" class="form-card">
+        <div class="form-grid">
+          <label>Tarih<input id="sohDate" type="date" required></label>
+          <label>Başlangıç SOC (%)<input id="sohStartSoc" type="number" min="0" max="100" step="1" required></label>
+          <label>Bitiş SOC (%)<input id="sohEndSoc" type="number" min="0" max="100" step="1" required></label>
+          <label>Sayaçtan Alınan Enerji (kWh)<input id="sohEnergy" type="number" min="0" step="0.01" required></label>
+          <label>Şarj Türü<select id="sohType"><option>AC</option><option>DC</option></select></label>
+          <label>Tahmini Şarj Kaybı (%)<input id="sohLoss" type="number" min="0" max="30" step="0.1" value="8"></label>
+          <label>Ortam Sıcaklığı (°C)<input id="sohTemp" type="number" step="0.1" placeholder="Örn. 22"></label>
+          <label>Kilometre<input id="sohOdo" type="number" min="0" step="1"></label>
+          <label class="span-2">Not<input id="sohNotes" type="text"></label>
+        </div>
+        <div id="sohPreview" class="calculation-preview"></div>
+        <div class="form-actions"><button type="submit">SOH Testini Kaydet</button></div>
+      </form>
+      <div class="table-wrap"><table><thead><tr><th>Tarih</th><th>SOC</th><th>Net Batarya Enerjisi</th><th>Tahmini Kapasite</th><th>SOH</th><th>Test Kalitesi</th><th>Km</th><th></th></tr></thead><tbody id="sohTable"></tbody></table></div>
+    </section>
+
+    <section id="crate" class="panel">
+      <div class="section-title"><div><h2>C-rate Simülatörü</h2><p>Şarj gücünü batarya kapasitesine oranlayarak anlık C-rate'i ve NMC/graphite açısından dikkat seviyesini görün.</p></div></div>
+      <div class="grid two">
+        <form id="crateForm" class="form-card">
+          <div class="form-grid compact-grid">
+            <label>Batarya Kapasitesi (kWh)<input id="crateCapacity" type="number" min="1" step="0.1" value="88.5"></label>
+            <label>Şarj Gücü (kW)<input id="cratePower" type="number" min="0" step="0.1" value="180"></label>
+            <label>Başlangıç SOC (%)<input id="crateStartSoc" type="number" min="0" max="100" step="1" value="20"></label>
+            <label>Bitiş SOC (%)<input id="crateEndSoc" type="number" min="0" max="100" step="1" value="80"></label>
+            <label>Batarya/Ortam Sıcaklığı (°C)<input id="crateTemp" type="number" step="0.1" value="20"></label>
+          </div>
+          <div class="preset-row">
+            <span>Hızlı seçim:</span>
+            <button type="button" class="chip" data-power="11">11 kW</button><button type="button" class="chip" data-power="22">22 kW</button><button type="button" class="chip" data-power="50">50 kW</button><button type="button" class="chip" data-power="90">90 kW</button><button type="button" class="chip" data-power="120">120 kW</button><button type="button" class="chip" data-power="150">150 kW</button><button type="button" class="chip" data-power="180">180 kW</button>
+          </div>
+        </form>
+        <article class="card" id="crateResult"></article>
+      </div>
+      <div class="grid two">
+        <article class="card"><h2>C-rate Eşiklerinin Yorumu</h2><div id="crateThresholds"></div></article>
+        <article class="card"><h2>Önemli Not</h2><p class="muted">Bu simülatör istasyonun/araç ekranının gördüğü gücü paket kapasitesine böler. Bu, hücre seviyesindeki gerçek akım dağılımının tam karşılığı değildir. T10X'te 180 kW yalnızca teorik anlık yaklaşık 2,03C'dir; BMS, SOC ve sıcaklığa göre gücü düşürür.</p></article>
+      </div>
+    </section>
+
+    <section id="analytics" class="panel">
+      <div class="cards" id="analyticsCards"></div>
+      <div class="grid two">
+        <article class="card"><h2>Tüketim Sayaç Eğilimi</h2><div id="consumptionTrend"></div></article>
+        <article class="card"><h2>Aylık Şarj Enerjisi</h2><div id="monthlyCharging"></div></article>
+      </div>
+      <div class="grid two">
+        <article class="card"><h2>Ayrıntılı Sürüşlerden Aylık Tüketim</h2><div id="monthlyConsumption"></div></article>
+        <article class="card"><h2>Sahiplik Tüketim Özeti</h2><div id="ownershipConsumption"></div></article>
+      </div>
+      <div class="grid two">
+        <article class="card"><h2>20–80 Uyum Detayı</h2><div id="complianceDetail"></div></article>
+        <article class="card"><h2>SOH Eğilimi</h2><div id="sohTrend"></div></article>
+      </div>
+      <div class="grid two">
+        <article class="card"><h2>AC/DC Denge Analizi</h2><div id="balanceAnalysis"></div></article>
+        <article class="card"><h2>C-rate Maruziyeti</h2><div id="crateExposure"></div></article>
+      </div>
+    </section>
+
+    <section id="knowledge" class="panel">
+      <div class="section-title"><div><h2>Bilgi / Bilimsel Dayanak</h2><p>Uygulamadaki karar kurallarının hangi bulgulara dayandığını burada görebilirsiniz.</p></div></div>
+      <div class="grid two">
+        <article class="card">
+          <h2>1. NMC/Graphite ve hızlı şarj</h2>
+          <p>2026 Journal of Power Sources çalışmasında NMC/graphite pouch hücreler 0,5C, 2C, 4C ve 6C'de karşılaştırıldı. İyi tasarlanmış hücreler 2C'de 1.000 çevrimin üzerinde kalabilirken, 4C ve 6C'de çevrim ömrü yaklaşık 500 çevrimin altına düştü. Baskın mekanizma graphite anotta lithium plating, lityum envanteri kaybı ve empedans artışıydı.</p>
+          <p><strong>Uygulama kuralı:</strong> ≤2C “yönetilebilir”, 2–4C “yüksek dikkat”, ≥4C “yüksek stres” olarak sınıflanır. Bu sınıflandırma paket için yaklaşık göstergedir; hücre seviyesine birebir eşit değildir.</p>
+          <p><a href="https://doi.org/10.1016/j.jpowsour.2026.240065" target="_blank" rel="noopener">Luo et al., Journal of Power Sources, 2026</a></p>
+        </article>
+        <article class="card">
+          <h2>2. Ortalama ve tepe C-rate</h2>
+          <p>Gerçek DC şarjda güç, SOC ve sıcaklığa bağlı olarak sürekli değişir. Bu nedenle uygulama enerji/süre üzerinden <strong>ortalama şarj gücünü</strong> ve ortalama C-rate'i hesaplar; kullanıcı görebiliyorsa maksimum güç ayrıca <strong>tepe C-rate</strong> olarak saklanır.</p>
+          <p><strong>Uygulama kuralı:</strong> Batarya Sağlık Skorunda seans maruziyeti için ortalama C-rate esas alınır. Maksimum değer varsa kısa süreli yüksek güç pikleri ek uyarı olarak değerlendirilir. Maksimum güç bilinmiyorsa uygulama ortalama değeri “tepe” gibi yorumlamaz.</p>
+        </article>
+        <article class="card">
+          <h2>3. Hızlı şarj sıklığı ve kimya</h2>
+          <p>2025 Journal of Power Sources çalışması ticari NMC, NCA ve LFP hücrelerde hızlı/yavaş şarj karışımlarını karşılaştırdı. Eşit kullanımda daha fazla hızlı şarj genel olarak daha düşük kapasiteyle ilişkilendirildi ve etkinin kimyaya göre değiştiği gösterildi.</p>
+          <p><strong>Uygulama kuralı:</strong> DC kullanımını yasaklamak yerine, son şarjlardaki DC enerji payını izleriz. Varsayılan hedef %40'tır; bu oran literatürde tanımlanmış tıbbi/teknik bir eşik değil, kullanıcıya denge sağlayan muhafazakâr bir takip hedefidir.</p>
+          <p><a href="https://doi.org/10.1016/j.jpowsour.2025.237552" target="_blank" rel="noopener">Morin, Whitacre & Michalek, Journal of Power Sources, 2025</a></p>
+        </article>
+        <article class="card">
+          <h2>4. SOC ve takvim yaşlanması</h2>
+          <p>NMC tabanlı hücrelerde yüksek SOC'de bekletme ve yüksek sıcaklık, takvim yaşlanmasını artırabilen önemli etkenlerdir. Bu nedenle uygulama %20–80 tercih bandını ve özellikle %80 üzerindeki şarj miktarını ayrı izler.</p>
+          <p><strong>Uygulama kuralı:</strong> %80 üzerine çıkmak “yasak” değildir; ihtiyaç yoksa yüksek SOC'de uzun süre bekletmekten kaçınmaya yönelik uyarı üretir.</p>
+          <p><a href="https://doi.org/10.1016/j.jpowsour.2025.238482" target="_blank" rel="noopener">Journal of Power Sources, 2025 – battery degradation quantitative review</a></p>
+        </article>
+        <article class="card">
+          <h2>5. Batarya Sağlık Skoru</h2>
+          <p>Skor dört açıklanabilir bileşenden oluşur: ölçülmüş SOH, %20–80 SOC disiplini, C-rate/şarj stresi ve seçilen DC enerji payı hedefi. Yeterli SOH verisi yoksa mevcut bileşenlerin ağırlıkları yeniden normalize edilir ve güven seviyesi düşürülür.</p>
+          <p><strong>Önemli:</strong> Bu puan bir laboratuvar veya BMS sağlık ölçümü değildir; kullanım alışkanlıklarını ve saha SOH testlerini tek ekranda izlemek için oluşturulmuş karar destek göstergesidir.</p>
+        </article>
+        <article class="card">
+          <h2>5. SOH hesabı nasıl yapılıyor?</h2>
+          <p>SOH testi, şarj cihazından alınan enerjiyi tahmini şarj kaybıyla düzelterek bataryaya giden net enerjiyi bulur; bunu SOC farkına ölçekleyerek tahmini kullanılabilir kapasiteyi hesaplar. SOH = tahmini kapasite / referans kapasite.</p>
+          <p><strong>Kalite puanı:</strong> SOC farkı ≥60 puan, AC şarj ve 15–30 °C civarı testler daha yüksek güvenilirlik alır. Sonuç, BMS diagnostik ölçümünün yerine geçmez.</p>
+        </article>
+      </div>
+      <div class="info-box"><strong>Bilimsel sınır:</strong> Literatür “iki DC'den sonra üç AC” gibi bir zorunluluk tanımlamaz. Uygulamanın “kaç AC gerekli?” önerisi, sizin seçtiğiniz DC enerji payı hedefine dönmek için gereken AC enerjisini matematiksel olarak hesaplayan bir kullanım koçudur.</div>
+    </section>
+
+    <section id="settings" class="panel">
+      <form id="settingsForm" class="form-card narrow">
+        <h2>Araç / Batarya Ayarları</h2>
+        <label>Araç Adı<input id="vehicleName" type="text"></label>
+        <label>Batarya Kimyası<input id="batteryChemistry" type="text"></label>
+        <label>Sahiplik Başlangıç Kilometresi<input id="ownershipStartOdo" type="number" min="0" step="1"></label>
+        <label>Sahiplik Başlangıç SOC (%)<input id="ownershipStartSoc" type="number" min="0" max="100" step="1"></label>
+        <label>Sahiplik Başlangıç Tarihi<input id="ownershipStartDate" type="date"></label>
+        <label>Uygulama Takip Başlangıç Kilometresi<input id="trackingStartOdo" type="number" min="0" step="1"></label>
+        <label>Güncel Kilometre<input id="currentOdo" type="number" min="0" step="1"></label>
+        <label>Güncel SOC (%)<input id="currentSoc" type="number" min="0" max="100" step="1"></label>
+        <label>Referans Kapasite (kWh)<input id="referenceCapacity" type="number" min="1" step="0.1"></label>
+        <label>Tercih Edilen Alt SOC (%)<input id="preferredMinSoc" type="number" min="0" max="100" step="1"></label>
+        <label>Tercih Edilen Üst SOC (%)<input id="preferredMaxSoc" type="number" min="0" max="100" step="1"></label>
+        <label>Hedef Maksimum DC Enerji Payı (%)<input id="targetDcShare" type="number" min="5" max="100" step="1"></label>
+        <label>Denge Analizi Penceresi (son kaç şarj?)<input id="balanceWindow" type="number" min="3" max="50" step="1"></label>
+        <p class="muted">Sahiplik başlangıç km'si, önceki sahibin kullanımını sizin davranış skorunuzdan ayırmak içindir. Varsayılan %40 DC hedefi bilimsel bir “zarar eşiği” değil; DC'yi yasaklamadan AC/DC kullanım dengesini takip etmek için ayarlanabilir bir kullanım hedefidir. 88,5 kWh nominal referanstır; doğrulanmış kullanılabilir kapasite elde edilirse SOH için referans kapasiteyi güncelleyin.</p>
+        <div class="form-actions"><button type="submit">Ayarları Kaydet</button><button type="button" id="clearAllBtn" class="danger">Tüm Verileri Sil</button></div>
+      </form>
+
+      <div class="form-card cloud-settings">
+        <div class="card-head"><div><h2>Firebase Bulut Senkronizasyonu</h2><p class="muted">GitHub Pages üzerinden iPhone ve diğer cihazlarda aynı veriye güvenli erişim.</p></div><span id="cloudStatusBadge" class="badge neutral">Local</span></div>
+        <div id="cloudSetupMessage" class="info-box">Firebase bağlantısı yapılandırıldı. E-posta/şifre ile giriş yaparak bulut senkronizasyonunu başlatabilirsiniz.</div>
+        <form id="cloudAuthForm" class="cloud-auth-form">
+          <label>E-posta<input id="cloudEmail" type="email" autocomplete="email" placeholder="ornek@email.com"></label>
+          <label>Şifre<input id="cloudPassword" type="password" autocomplete="current-password" minlength="6" placeholder="En az 6 karakter"></label>
+          <div class="cloud-auth-actions"><button id="cloudSignInBtn" type="submit">Giriş Yap</button><button id="cloudRegisterBtn" type="button" class="secondary">Hesap Oluştur</button><button id="cloudSignOutBtn" type="button" class="secondary" hidden>Çıkış Yap</button></div>
+        </form>
+        <div id="cloudUserInfo" class="cloud-user-info muted">Bulut hesabına giriş yapılmadı.</div>
+        <div class="cloud-sync-actions">
+          <button id="cloudUploadBtn" type="button" class="secondary" disabled>Bu Cihazdaki Veriyi Buluta Gönder</button>
+          <button id="cloudDownloadBtn" type="button" class="secondary" disabled>Buluttaki Veriyi Bu Cihaza Al</button>
+        </div>
+        <p class="muted">Uygulama local-first çalışır. Giriş yaptıktan sonra değişiklikler Firebase Realtime Database altında yalnızca sizin kullanıcı kimliğinizle eşleşen alana senkronize edilir. JSON yedeği almaya devam etmeniz önerilir.</p>
+      </div>
+
+      <div class="form-card provider-settings">
+        <div class="card-head"><div><h2>Şarj Sağlayıcıları</h2><p class="muted">Liste dinamik tutulur. Yeni sağlayıcı ekleyebilir, kullanmadıklarınızı kaldırabilirsiniz.</p></div><button type="button" id="providerResetBtn" class="secondary">Varsayılan Listeyi Geri Yükle</button></div>
+        <div class="provider-add-row"><input id="providerNew" type="text" placeholder="Yeni sağlayıcı adı"><button type="button" id="providerAddBtn">Ekle</button></div>
+        <div id="providerManager" class="provider-manager"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>v0.8.1 · Firebase yapılandırıldı · Local-first + Firebase Sync · GitHub Pages hazır · iPhone uyumlu · km/SOC eksik geçmiş kayıt desteği · süre→ortalama güç/C-rate</footer>
+  <script src="app.js"></script>
+  <script type="module" src="firebase-sync.js"></script>
+  <script>
+    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+    }
+  </script>
+</body>
+</html>
