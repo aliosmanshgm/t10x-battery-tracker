@@ -310,6 +310,16 @@ function weightedTripConsumption(){
   const distance=sum(valid.map(x=>x.distance));
   return distance?sum(valid.map(x=>Number(x.distance)*Number(x.consumption)))/distance:null;
 }
+function costPer100Metrics(){
+  const cons=latestConsumptionSnapshot();
+  const consumption=cons&&Number(cons.total)>0?Number(cons.total):null;
+  const priced=ownerCharges().filter(x=>chargeEnergyValue(x)>0&&x.cost!==null&&x.cost!==undefined&&x.cost!==''&&Number.isFinite(Number(x.cost)));
+  const pricedEnergy=sum(priced.map(chargeEnergyValue));
+  const pricedCost=sum(priced.map(x=>Number(x.cost)));
+  const avgPrice=pricedEnergy>0?pricedCost/pricedEnergy:null;
+  const costPer100=consumption!=null&&avgPrice!=null?consumption*avgPrice:null;
+  return{consumption,avgPrice,costPer100,pricedEnergy,pricedCount:priced.length};
+}
 function updateCurrentState(odo,soc=null){
   const n=Number(odo),current=Number(db.settings.currentOdo)||0;
   if(n>0&&n>=current)db.settings.currentOdo=n;
@@ -395,7 +405,7 @@ function group(arr,keyFn,valueKey){const m={};for(const x of arr){const k=keyFn(
 function renderBars(id,obj,suffix=''){const el=byId(id);const entries=Object.entries(obj).sort((a,b)=>b[1]-a[1]);if(!entries.length){el.innerHTML='<div class="empty">Veri yok.</div>';return}const max=Math.max(...entries.map(x=>x[1]),1);el.innerHTML=entries.slice(0,8).map(([k,v])=>`<div class="bar-row"><div class="bar-label"><span>${escapeHtml(k)}</span><strong>${fmt(v,1)}${suffix}</strong></div><div class="bar-track"><div class="bar-fill" style="width:${v/max*100}%"></div></div></div>`).join('')}
 
 function renderDashboard(){
-  const c=ownerCharges(),t=db.trips,soh=referenceSoh(),cons=latestConsumptionSnapshot();
+  const c=ownerCharges(),t=db.trips,soh=referenceSoh(),cons=latestConsumptionSnapshot(),cost100=costPer100Metrics();
   const energyTotal=sum(c.map(chargeEnergyValue));const dcEnergy=sum(c.filter(x=>x.type==='DC').map(chargeEnergyValue));
   const socCharges=c.filter(hasSocPair);
   const complianceWeighted=socCharges.length?avg(socCharges.map(x=>chargeCompliance(x).ratio))*100:null;
@@ -404,8 +414,9 @@ function renderDashboard(){
   const cards=[
     ['Kilometre',latestOdo()?fmt(latestOdo(),0)+' km':'—','Son kayıt'],
     ['Sahiplik Mesafesi',ownershipKm()!=null?fmt(ownershipKm(),0)+' km':'—','32.356 km başlangıç'],
-    ['Son Şarjdan Beri',cons?fmt(cons.sinceCharge,1)+' kWh/100':'—','Son tüketim sayaç kaydı'],
-    ['Toplam Ortalama',cons?fmt(cons.total,1)+' kWh/100':'—','Sahiplik dönemi'],
+    ['Son Şarjdan Beri',cons?fmt(cons.sinceCharge,1)+' kWh/100 km':'—','Son tüketim sayaç kaydı'],
+    ['100 km Tüketim',cost100.consumption!=null?fmt(cost100.consumption,1)+' kWh/100 km':'—','Sahiplik dönemi toplam ortalama'],
+    ['100 km Maliyet',cost100.costPer100!=null?fmt(cost100.costPer100,2)+' ₺/100 km':'—',cost100.avgPrice!=null?fmt(cost100.avgPrice,2)+' ₺/kWh ortalama şarj maliyeti':'Maliyetli şarj kaydı gerekli'],
     ['Takip SOH',soh?fmt(soh.soh,1)+'%':'—',soh?soh.mode:'Kontrollü testlerden'],
     ['Şarj Kaydı',c.length,'Toplam oturum'],
     ['DC Enerji Payı',energyTotal?fmt(dcEnergy/energyTotal*100,1)+'%':'—',c.filter(x=>x.type==='DC').length+' DC oturumu'],
@@ -483,13 +494,13 @@ function renderCrate(){
 }
 
 function renderAnalytics(){
-  const c=ownerCharges(),t=db.trips,s=db.sohTests,b=balanceStats(),cons=latestConsumptionSnapshot();
+  const c=ownerCharges(),t=db.trips,s=db.sohTests,b=balanceStats(),cons=latestConsumptionSnapshot(),cost100=costPer100Metrics();
   const totalCost=sum(c.map(x=>x.cost)),totalEnergy=sum(c.map(chargeEnergyValue)),dcEnergy=sum(c.filter(x=>x.type==='DC').map(chargeEnergyValue));
   const socKnown=c.filter(hasSocPair);
   const full=socKnown.filter(x=>chargeCompliance(x).full).length;
   const rates=c.map(chargeCRate).filter(x=>x!=null);
   const avgRates=c.map(chargeAverageCRate).filter(x=>x!=null),peakRates=c.map(chargePeakCRate).filter(x=>x!=null);
-  const cards=[['Sahiplik Mesafesi',ownershipKm()!=null?fmt(ownershipKm(),0)+' km':'—'],['Son Şarjdan Beri',cons?fmt(cons.sinceCharge,1)+' kWh/100':'—'],['Toplam Tüketim',cons?fmt(cons.total,1)+' kWh/100':'—'],['Toplam Şarj Enerjisi',fmt(totalEnergy,1)+' kWh'],['Toplam Şarj Maliyeti',fmt(totalCost,0)+' ₺'],['Ort. Enerji Maliyeti',totalEnergy?fmt(totalCost/totalEnergy,2)+' ₺/kWh':'—'],['DC Enerji Payı',totalEnergy?fmt(dcEnergy/totalEnergy*100,1)+'%':'—'],['Tam Uyumlu Oturum',socKnown.length?fmt(full/socKnown.length*100,0)+'%':'—'],['Ort. Seans C-rate',avgRates.length?fmt(avg(avgRates),2)+'C':rates.length?fmt(avg(rates),2)+'C':'—'],['Maks. Tepe C-rate',peakRates.length?fmt(Math.max(...peakRates),2)+'C':'—']];
+  const cards=[['Sahiplik Mesafesi',ownershipKm()!=null?fmt(ownershipKm(),0)+' km':'—'],['Son Şarjdan Beri',cons?fmt(cons.sinceCharge,1)+' kWh/100 km':'—'],['100 km Tüketim',cost100.consumption!=null?fmt(cost100.consumption,1)+' kWh/100 km':'—'],['100 km Maliyet',cost100.costPer100!=null?fmt(cost100.costPer100,2)+' ₺/100 km':'—'],['Toplam Şarj Enerjisi',fmt(totalEnergy,1)+' kWh'],['Toplam Şarj Maliyeti',fmt(totalCost,0)+' ₺'],['Ort. Enerji Maliyeti',cost100.avgPrice!=null?fmt(cost100.avgPrice,2)+' ₺/kWh':'—'],['DC Enerji Payı',totalEnergy?fmt(dcEnergy/totalEnergy*100,1)+'%':'—'],['Tam Uyumlu Oturum',socKnown.length?fmt(full/socKnown.length*100,0)+'%':'—'],['Ort. Seans C-rate',avgRates.length?fmt(avg(avgRates),2)+'C':rates.length?fmt(avg(rates),2)+'C':'—'],['Maks. Tepe C-rate',peakRates.length?fmt(Math.max(...peakRates),2)+'C':'—']];
   byId('analyticsCards').innerHTML=cards.map(x=>`<div class="metric"><div class="label">${x[0]}</div><div class="value">${x[1]}</div></div>`).join('');
   renderBars('monthlyConsumption',monthlyAvg(t,'consumption'),' kWh/100');renderBars('monthlyCharging',monthlySum(c,'energy'),' kWh');
   const trend=[...db.consumptionSnapshots].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,12);
@@ -520,7 +531,7 @@ D.chargeForm.addEventListener('submit',e=>{
   e.preventDefault();const id=D.chargeId.value||uid();
   const odoUnknown=!!D.chargeOdoUnknown.checked;
   const startSoc=D.chargeStartSoc.value===''?null:+D.chargeStartSoc.value,endSoc=D.chargeEndSoc.value===''?null:+D.chargeEndSoc.value;
-  const item={id,date:D.chargeDate.value,odo:odoUnknown?null:(D.chargeOdo.value?+D.chargeOdo.value:null),startSoc,endSoc,type:D.chargeType.value,scope:D.chargeScope.value||'owner_current',power:+D.chargePower.value||null,energy:+D.chargeEnergy.value||null,durationMin:+D.chargeDuration.value||null,provider:D.chargeProvider.value.trim(),cost:+D.chargeCost.value||null,temp:D.chargeTemp.value===''?null:+D.chargeTemp.value,location:D.chargeLocation.value.trim(),notes:D.chargeNotes.value.trim()};
+  const item={id,date:D.chargeDate.value,odo:odoUnknown?null:(D.chargeOdo.value?+D.chargeOdo.value:null),startSoc,endSoc,type:D.chargeType.value,scope:D.chargeScope.value||'owner_current',power:+D.chargePower.value||null,energy:+D.chargeEnergy.value||null,durationMin:+D.chargeDuration.value||null,provider:D.chargeProvider.value.trim(),cost:D.chargeCost.value===''?null:+D.chargeCost.value,temp:D.chargeTemp.value===''?null:+D.chargeTemp.value,location:D.chargeLocation.value.trim(),notes:D.chargeNotes.value.trim()};
   if(hasSocValue(item.startSoc)&&hasSocValue(item.endSoc)&&item.endSoc<=item.startSoc)return alert('Bitiş SOC, başlangıç SOC değerinden büyük olmalı.');
   if(item.scope==='owner_current'&&((item.odo&&item.odo<Number(db.settings.trackingStartOdo))||odoUnknown))item.scope='owner_history';
   const i=db.charges.findIndex(x=>x.id===id);i>=0?db.charges[i]=item:db.charges.push(item);if(item.scope==='owner_current')updateCurrentState(item.odo,item.endSoc);save();resetCharge();
