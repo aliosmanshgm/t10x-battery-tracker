@@ -1,4 +1,6 @@
-# T10X Batarya & Şarj Takip v0.8.4
+# Premium / Apple mobil arayüz
+
+# T10X Batarya & Şarj Takip v0.8.6A
 
 Bu sürüm Firebase Web App yapılandırması işlenmiş, GitHub Pages'e yüklemeye hazır sürümdür.
 
@@ -31,14 +33,14 @@ Analytics zorunlu değildir; uygulamanın çalışma mantığı Authentication +
 Repo köküne bu klasörün içindeki dosyaları yükleyin.
 Settings > Pages > Deploy from a branch > `main` / `(root)` seçin.
 
-### v0.8.4 tek kullanıcı giriş modeli
+### v0.8.6A tek kullanıcı giriş modeli
 - Ana uygulama Firebase Authentication oturumu olmadan görünmez.
 - Uygulama içinde kullanıcı kaydı/üyelik oluşturma yoktur.
 - Kullanıcı Firebase Console > Authentication > Users üzerinden yönetilir.
 - `database.rules.single-user.template.json` ile veritabanı tek User UID'ye kilitlenebilir.
 
 
-### v0.8.4 Dashboard 100 km göstergeleri
+### v0.8.6A Dashboard 100 km göstergeleri
 - Gösterge Paneline `100 km Tüketim (kWh/100 km)` ve `100 km Maliyet (TL/100 km)` kartları eklendi.
 - 100 km maliyeti, son sahiplik dönemi toplam tüketimi ile maliyeti bilinen şarjların enerji-ağırlıklı ortalama TL/kWh değerinin çarpımıdır.
 - Maliyeti girilmemiş oturumlar ortalama birim fiyatı yapay olarak düşürmez.
