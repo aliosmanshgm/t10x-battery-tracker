@@ -182,7 +182,7 @@ const domIds=[
   'sohForm','sohDate','sohStartSoc','sohEndSoc','sohEnergy','sohType','sohLoss','sohTemp','sohOdo','sohNotes',
   'crateForm','crateCapacity','cratePower','crateStartSoc','crateEndSoc','crateTemp',
   'settingsForm','vehicleName','batteryChemistry','ownershipStartOdo','ownershipStartSoc','ownershipStartDate','trackingStartOdo','currentOdo','currentSoc','referenceCapacity','preferredMinSoc','preferredMaxSoc','targetDcShare','balanceWindow','clearAllBtn',
-  'quickStatusForm','quickCurrentOdo','quickCurrentSoc','providerNew','providerAddBtn','providerResetBtn','providerManager','providerList',
+  'quickStatusForm','quickCurrentOdo','quickCurrentSoc','providerNew','providerAddBtn','providerResetBtn','providerManager',
   'exportJsonBtn','importJsonInput','exportChargesCsv','exportConsumptionCsv','exportTripsCsv'
 ];
 const D=Object.fromEntries(domIds.map(id=>[id,byId(id)]));
@@ -518,7 +518,12 @@ function monthlySum(arr,key){const m={};arr.forEach(x=>{const k=monthKey(x.date)
 function monthlyAvg(arr,key){const m={};arr.forEach(x=>{const k=monthKey(x.date);if(!k)return;(m[k]??=[]).push(Number(x[key])||0)});return Object.fromEntries(Object.entries(m).map(([k,v])=>[k,avg(v)]))}
 
 function renderProviders(){
-  D.providerList.innerHTML=db.providers.map(x=>`<option value="${escapeHtml(x)}"></option>`).join('');
+  const current=D.chargeProvider?.value||'';
+  const providers=[...db.providers].sort((a,b)=>a.localeCompare(b,'tr'));
+  const options=['<option value="">Sağlayıcı seçin…</option>',...providers.map(x=>`<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`)];
+  if(current&&!providers.includes(current))options.push(`<option value="${escapeHtml(current)}">${escapeHtml(current)} (kayıtlı)</option>`);
+  D.chargeProvider.innerHTML=options.join('');
+  if(current)D.chargeProvider.value=current;
   D.providerManager.innerHTML=db.providers.length?db.providers.map((x,i)=>`<span class="provider-chip">${escapeHtml(x)}<button type="button" aria-label="${escapeHtml(x)} sağlayıcısını kaldır" onclick="removeProvider(${i})">×</button></span>`).join(''):'<div class="empty">Sağlayıcı listesi boş.</div>';
 }
 function renderSettings(){
@@ -537,7 +542,7 @@ D.chargeForm.addEventListener('submit',e=>{
   const i=db.charges.findIndex(x=>x.id===id);i>=0?db.charges[i]=item:db.charges.push(item);if(item.scope==='owner_current')updateCurrentState(item.odo,item.endSoc);save();resetCharge();
 });
 function resetCharge(){D.chargeForm.reset();D.chargeId.value='';D.chargeType.value='AC';D.chargeScope.value='owner_current';D.chargeOdo.disabled=false;D.chargeOdo.placeholder='Örn. 33537';setDefaultDateTimes();updateChargePreview()}D.chargeReset.onclick=resetCharge;
-window.editCharge=id=>{const x=db.charges.find(v=>v.id===id);if(!x)return;showTab('charges');D.chargeOdoUnknown.checked=(x.odo==null&&x.scope==='owner_history');D.chargeOdo.disabled=D.chargeOdoUnknown.checked;for(const [el,val] of [[D.chargeId,x.id],[D.chargeDate,x.date],[D.chargeOdo,x.odo],[D.chargeStartSoc,x.startSoc],[D.chargeEndSoc,x.endSoc],[D.chargeType,x.type],[D.chargeScope,x.scope||'owner_current'],[D.chargePower,x.power],[D.chargeEnergy,x.energy],[D.chargeDuration,x.durationMin],[D.chargeProvider,x.provider],[D.chargeCost,x.cost],[D.chargeTemp,x.temp],[D.chargeLocation,x.location],[D.chargeNotes,x.notes]])el.value=val??'';updateChargePreview();window.scrollTo({top:120,behavior:'smooth'})};
+window.editCharge=id=>{const x=db.charges.find(v=>v.id===id);if(!x)return;showTab('charges');D.chargeOdoUnknown.checked=(x.odo==null&&x.scope==='owner_history');D.chargeOdo.disabled=D.chargeOdoUnknown.checked;if(x.provider&&![...D.chargeProvider.options].some(o=>o.value===x.provider))D.chargeProvider.add(new Option(`${x.provider} (kayıtlı)`,x.provider));for(const [el,val] of [[D.chargeId,x.id],[D.chargeDate,x.date],[D.chargeOdo,x.odo],[D.chargeStartSoc,x.startSoc],[D.chargeEndSoc,x.endSoc],[D.chargeType,x.type],[D.chargeScope,x.scope||'owner_current'],[D.chargePower,x.power],[D.chargeEnergy,x.energy],[D.chargeDuration,x.durationMin],[D.chargeProvider,x.provider],[D.chargeCost,x.cost],[D.chargeTemp,x.temp],[D.chargeLocation,x.location],[D.chargeNotes,x.notes]])el.value=val??'';updateChargePreview();window.scrollTo({top:120,behavior:'smooth'})};
 window.deleteCharge=id=>{if(confirm('Bu şarj kaydı silinsin mi?')){db.charges=db.charges.filter(x=>x.id!==id);save()}};
 ['chargePower','chargeEnergy','chargeDuration','chargeStartSoc','chargeEndSoc','chargeTemp','chargeType'].forEach(id=>byId(id).addEventListener('input',updateChargePreview));
 D.chargeOdoUnknown.addEventListener('change',()=>{D.chargeOdo.disabled=D.chargeOdoUnknown.checked;if(D.chargeOdoUnknown.checked){D.chargeOdo.value='';if(D.chargeScope.value==='owner_current')D.chargeScope.value='owner_history';}D.chargeOdo.placeholder=D.chargeOdoUnknown.checked?'Geçmiş kayıt - bilinmiyor':'Örn. 33537';});
