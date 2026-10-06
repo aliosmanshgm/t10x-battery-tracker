@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="T10X Batarya" />
   <meta name="mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="manifest.webmanifest" />
-  <title>T10X Batarya & Şarj Takip v0.8.8A · Premium / Apple</title>
+  <title>T10X Batarya & Şarj Takip v0.9.0 · Premium / Apple · Charge Planner</title>
   <link rel="stylesheet" href="app.css" />
 </head>
 <body>
@@ -36,7 +36,7 @@
   <header class="topbar">
     <div>
       <h1>T10X Batarya & Şarj Takip</h1>
-      <p>NMC odaklı local takip · Sağlık Skoru · SOH · SOC · C-rate · AC/DC denge önerileri</p>
+      <p>NMC odaklı karar desteği · SOH · SOC×zaman · C-rate · termal bağlam · dinamik şarj planlama</p>
     </div>
     <div class="top-actions">
       <span id="cloudStatusPill" class="cloud-pill local">Bulut: Local</span>
@@ -49,6 +49,7 @@
     <button class="tab active" data-tab="dashboard">Gösterge Paneli</button>
     <button class="tab" data-tab="charges">Şarj Kayıtları</button>
     <button class="tab" data-tab="trips">Tüketim / Sürüş</button>
+    <button class="tab" data-tab="planner">Şarj Planlayıcı</button>
     <button class="tab" data-tab="soh">SOH Testleri</button>
     <button class="tab" data-tab="crate">C-rate Simülatörü</button>
     <button class="tab" data-tab="analytics">Analizler</button>
@@ -111,8 +112,18 @@
           <div id="smartRecommendation"></div>
         </article>
         <article class="card">
-          <div class="card-head"><h2>20–80 Uyum Özeti</h2></div>
+          <div class="card-head"><h2>20–80 Koruma Bandı</h2></div>
           <div id="complianceSummary"></div>
+        </article>
+      </div>
+      <div class="grid two">
+        <article class="card">
+          <div class="card-head"><h2>SOC × Zaman Maruziyeti</h2><button class="link-btn" data-goto="stress">Detay</button></div>
+          <div id="socTimeDashboard"></div>
+        </article>
+        <article class="card">
+          <div class="card-head"><h2>Dinamik Şarj Hedefi</h2><button class="link-btn" data-goto="planner">Planla</button></div>
+          <div id="plannerDashboard"></div>
         </article>
       </div>
       <div class="grid two">
@@ -135,7 +146,7 @@
       <form id="chargeForm" class="form-card">
         <input type="hidden" id="chargeId">
         <div class="form-grid">
-          <label>Tarih / Saat<input id="chargeDate" type="datetime-local" required></label>
+          <label>Şarj Başlangıç Tarihi / Saati<input id="chargeDate" type="datetime-local" required></label>
           <label>Kilometre <span class="muted">(opsiyonel geçmiş kayıtta)</span><input id="chargeOdo" type="number" min="0" step="1" placeholder="Örn. 33537"></label>
           <label class="checkbox-label"><input id="chargeOdoUnknown" type="checkbox"> Geçmiş kayıtta kilometre bilgim yok</label>
           <label>Başlangıç SOC (%) <span class="muted">(opsiyonel geçmiş kayıtta)</span><input id="chargeStartSoc" type="number" min="0" max="100" step="1" placeholder="Bilinmiyorsa boş bırakın"></label>
@@ -147,7 +158,13 @@
           <label>Maksimum Görülen Güç (kW) · Opsiyonel<input id="chargePower" type="number" min="0" step="0.1" placeholder="Örn. 176"></label>
           <label>Sağlayıcı<select id="chargeProvider"><option value="">Sağlayıcı seçin…</option></select></label>
           <label>Maliyet (₺)<input id="chargeCost" type="number" min="0" step="0.01"></label>
-          <label>Ortam Sıcaklığı (°C)<input id="chargeTemp" type="number" step="0.1"></label>
+          <label>Ortam Sıcaklığı (°C)<input id="chargeTemp" type="number" step="0.1" placeholder="Otomatik veya manuel"></label>
+          <label>Sıcaklık Kaynağı<select id="chargeTempSource"><option value="manual">Manuel</option><option value="open-meteo">Konumdan otomatik · Open-Meteo</option><option value="mgm-reference">MGM resmi referans</option></select></label>
+          <label>Gerçek Batarya Sıcaklığı (°C) · Varsa<input id="chargeBatteryTemp" type="number" step="0.1" placeholder="BMS/servis verisi varsa"></label>
+          <label>Şarj Öncesi Park<select id="chargeParking"><option value="unknown">Bilinmiyor</option><option value="garage">Kapalı otopark</option><option value="outdoor-shade">Açık hava · gölge</option><option value="outdoor-sun">Açık hava · güneş</option></select></label>
+          <label>Park Süresi (saat)<input id="chargeParkHours" type="number" min="0" step="0.5" placeholder="Örn. 8"></label>
+          <label>Şarj Öncesi Sürüş (dk)<input id="chargePreDriveMin" type="number" min="0" step="1" placeholder="Örn. 25"></label>
+          <div class="weather-action"><button type="button" id="chargeWeatherBtn" class="secondary">Konumdan Sıcaklık Al</button><span id="chargeWeatherStatus" class="muted">Koordinat kaydedilmez.</span></div>
           <label class="span-2">Konum / İstasyon<input id="chargeLocation" type="text" placeholder="Örn. Ankara - Trugo Söğütözü"></label>
           <label class="span-2">Not<textarea id="chargeNotes" rows="2"></textarea></label>
         </div>
@@ -191,6 +208,40 @@
         <div class="form-actions"><button type="submit">Kaydet</button><button type="button" id="tripReset" class="secondary">Temizle</button></div>
       </form>
       <div class="table-wrap"><table><thead><tr><th>Tarih</th><th>Mesafe</th><th>Tüketim</th><th>Enerji</th><th>SOC</th><th>Rota</th><th></th></tr></thead><tbody id="tripsTable"></tbody></table></div>
+    </section>
+
+
+    <section id="planner" class="panel">
+      <div class="section-title"><div><h2>Dinamik Şarj Planlayıcı</h2><p>Planlanan yol, tüketim, mevcut SOC, güç ve termal bağlama göre ihtiyaç kadar hedef SOC ve şarj zamanını hesaplar.</p></div></div>
+      <div class="info-box"><strong>Temel yaklaşım:</strong> %20–80 katı bir çevrim hedefi değildir. Uygulama, yol için gereken enerjiyi ve seçtiğiniz rezervi hesaplar; ihtiyaç %80'in altındaysa gereksiz yere %80'e çıkmayı önermez. %80 üzeri gerekiyorsa şarjın mümkün olduğunca hareket saatine yakın tamamlanmasını önerir.</div>
+      <div class="grid two">
+        <form id="plannerForm" class="form-card">
+          <div class="form-grid compact-grid">
+            <label>Mevcut SOC (%)<input id="plannerCurrentSoc" type="number" min="0" max="100" step="1"></label>
+            <label>Planlanan Mesafe (km)<input id="plannerDistance" type="number" min="0" step="1" value="100"></label>
+            <label>Beklenen Tüketim (kWh/100 km)<input id="plannerConsumption" type="number" min="1" step="0.1"></label>
+            <label>Hedef Rezerv SOC (%)<input id="plannerReserveSoc" type="number" min="0" max="40" step="1" value="15"></label>
+            <label>Planlama Güvenlik Payı (%)<input id="plannerMargin" type="number" min="0" max="50" step="1" value="10"></label>
+            <label>Hareket Tarihi / Saati<input id="plannerDeparture" type="datetime-local"></label>
+            <label>Şarj Türü<select id="plannerChargeType"><option value="AC">AC</option><option value="DC">DC</option></select></label>
+            <label>Beklenen Ortalama Şarj Gücü (kW)<input id="plannerPower" type="number" min="1" step="0.1" value="11"></label>
+            <label>Ortam Sıcaklığı (°C)<input id="plannerAmbientTemp" type="number" step="0.1" placeholder="Otomatik veya manuel"></label>
+            <label>Park Ortamı<select id="plannerParking"><option value="garage">Kapalı otopark</option><option value="outdoor-shade">Açık hava · gölge</option><option value="outdoor-sun">Açık hava · güneş</option><option value="unknown">Bilinmiyor</option></select></label>
+            <label>Park Süresi (saat)<input id="plannerParkHours" type="number" min="0" step="0.5" value="8"></label>
+            <label>Şarj Öncesi Sürüş (dk)<input id="plannerPreDriveMin" type="number" min="0" step="1" value="0"></label>
+          </div>
+          <div class="planner-weather-row"><button type="button" id="plannerWeatherBtn" class="secondary">Konumdan Hava Verisi Al</button><span id="plannerWeatherStatus" class="muted">iPhone konumu yalnızca hava sorgusu için kullanılır; koordinat Firebase'e kaydedilmez.</span></div>
+          <div class="form-actions"><button type="submit">Planı Hesapla</button></div>
+        </form>
+        <article class="card planner-result-card">
+          <div class="card-head"><h2>Önerilen Plan</h2><span id="plannerBadge" class="badge neutral">Hazır</span></div>
+          <div id="plannerResult"><div class="empty">Planlama verilerini girip hesaplayın.</div></div>
+        </article>
+      </div>
+      <div class="grid two">
+        <article class="card"><h2>Termal Bağlam</h2><div id="plannerThermal"></div></article>
+        <article class="card"><h2>Hava Verisi / MGM</h2><div id="plannerWeatherDetail"></div><p class="muted">Otomatik sıcaklık, tarayıcı CORS kısıtları nedeniyle güvenilir makine-okunabilir kaynak olarak Open-Meteo'dan alınır. MGM'nin resmi Ankara saatlik tahmin sayfası ayrıca referans olarak açılabilir; uygulama mimarisi ileride MGM için sunucu-tarafı proxy bağlanmasına hazırdır.</p><a id="plannerMgmLink" href="https://www.mgm.gov.tr/tahmin/saatlik.aspx?m=ANKARA" target="_blank" rel="noopener">MGM · Ankara saatlik tahminini aç</a></article>
+      </div>
     </section>
 
     <section id="soh" class="panel">
@@ -254,15 +305,19 @@
         <article class="card"><h2>SOH Eğilimi</h2><div id="sohTrend"></div></article>
       </div>
       <div class="grid two">
-        <article class="card"><h2>AC/DC Denge Analizi</h2><div id="balanceAnalysis"></div></article>
+        <article class="card"><h2>AC/DC & C-rate İstatistiği</h2><div id="balanceAnalysis"></div></article>
         <article class="card"><h2>C-rate Maruziyeti</h2><div id="crateExposure"></div></article>
       </div>
     </section>
 
     <section id="stress" class="panel">
-      <div class="section-title"><div><h2>Batarya Stres Analizi</h2><p>NMC/graphite için SOC, C-rate, sıcaklık etkileşimi ve şarj throughput maruziyetini ayrı ayrı izler.</p></div></div>
-      <div class="info-box"><strong>Yorumlama:</strong> Battery Stress Index (BSI) 0–100 arasıdır ve <strong>düşük değer daha iyidir</strong>. İndeks, Journal of Power Sources'ta yayımlanan stress-factor yaklaşımından <em>kavramsal olarak</em> esinlenen bir saha göstergesidir; makaledeki fit katsayılarını kopyalamaz ve üretici BMS modeli veya doğrulanmış kalan ömür (RUL) tahmini değildir. İlgili 2026 çalışması kendi test aralığında DOD'u güçlü, C-rate etkisini ise daha sınırlı bulurken; ayrı hızlı-şarj çalışmalarında 4C+ bölgede belirgin rate etkisi görülmektedir. Eksik veri olan bileşenler skordan çıkarılır ve ağırlıklar yeniden normalize edilir.</div>
+      <div class="section-title"><div><h2>Batarya Stres Analizi</h2><p>NMC/graphite için cycle/charge stresi ile calendar stresini ayırır; SOC×zaman, C-rate, şarj derinliği ve termal bağlamı birlikte izler.</p></div></div>
+      <div class="info-box"><strong>Yorumlama:</strong> Battery Stress Index (BSI) 0–100 arasıdır ve <strong>düşük değer daha iyidir</strong>. v0.9 ile AC/DC etiketi BSI'dan çıkarılmıştır. İndeks iki fiziksel sınıfı ayrı tutar: <strong>Cycle/Charge Stress Index (CSI)</strong> C-rate, şarj derinliği ve yüksek-SOC şarj penceresine; <strong>Calendar Stress Index (CalSI)</strong> ise SOC×zaman ve termal bağlama dayanır. Bunlar açıklanabilir heuristic göstergelerdir; üretici BMS modeli veya RUL tahmini değildir.</div>
       <div class="cards" id="stressCards"></div>
+      <div class="grid two">
+        <article class="card"><div class="card-head"><h2>Cycle / Charge Stress Index</h2><span id="cycleStressBadge" class="badge neutral"></span></div><div id="cycleStressDetail"></div></article>
+        <article class="card"><div class="card-head"><h2>Calendar Stress Index</h2><span id="calendarStressBadge" class="badge neutral"></span></div><div id="calendarStressDetail"></div></article>
+      </div>
       <div class="grid two">
         <article class="card stress-score-card">
           <div class="card-head"><h2>Son Dönem BSI</h2><span id="stressPanelConfidence" class="badge neutral"></span></div>
@@ -276,19 +331,23 @@
         <article class="card"><h2>C-rate Enerji Maruziyeti</h2><div id="stressCRateBands"></div><p class="muted">Enerji + süre varsa ortalama C-rate; yoksa mevcut maksimum güç verisi kullanılır.</p></article>
       </div>
       <div class="grid two">
-        <article class="card"><h2>Sıcaklık Maruziyeti</h2><div id="stressTempBands"></div><p class="muted">Girilen değer ortam sıcaklığıdır; hücre/pack çekirdek sıcaklığı yerine yalnızca proxy olarak kullanılır.</p></article>
+        <article class="card"><h2>Ortam Sıcaklığı Maruziyeti</h2><div id="stressTempBands"></div><p class="muted">Ortam sıcaklığı yalnızca termal proxy’dir. Gerçek batarya sıcaklığı girilmişse algoritma onu önceliklendirir; değilse park ortamı, park süresi ve şarj öncesi sürüş ile nitel termal durum oluşturulur.</p></article>
         <article class="card"><h2>Throughput / EFC Özeti</h2><div id="stressThroughput"></div></article>
       </div>
       <div class="grid two">
+        <article class="card"><h2>SOC × Zaman Özeti</h2><div id="socTimeStress"></div></article>
+        <article class="card"><h2>Manuel SOC Günlüğü</h2><div id="socSnapshotList"></div><p class="muted">Dashboard’daki “Güncel Araç Durumu” her güncellendiğinde zaman damgalı bir SOC noktası ekler. Şarj başlangıç/bitiş SOC’leri ayrıca otomatik zaman çizgisine katılır.</p></article>
+      </div>
+      <div class="grid two">
         <article class="card"><h2>Teknik Yorum</h2><div id="stressInterpretation"></div></article>
-        <article class="card"><h2>İndeks Formülü</h2><div class="mini-list"><div class="mini-item vertical"><strong>SOC stresi · %35</strong><span>%80–90 arası orta, %90–100 arası daha yüksek ağırlık. Bilinmeyen SOC skorlanmaz.</span></div><div class="mini-item vertical"><strong>C-rate stresi · %35</strong><span>Ortalama C-rate esas; varsa yüksek tepe C-rate sınırlı ek ceza oluşturur.</span></div><div class="mini-item vertical"><strong>Sıcaklık etkileşimi · %20</strong><span>15–30 °C referans düşük stres bölgesi; soğuk + yüksek C-rate ve sıcak + yüksek SOC kombinasyonları ayrıca ağırlaştırılır.</span></div><div class="mini-item vertical"><strong>DC enerji dengesi · %10</strong><span>Bilimsel zarar eşiği değil; Ayarlar'daki kullanıcı hedefinin aşılması davranışsal proxy olarak kullanılır.</span></div></div><p class="muted">EFC ve toplam throughput kümülatif maruziyet olarak ayrıca raporlanır; yaş ilerledikçe BSI'yi otomatik kötüleştirmemesi için doğrudan BSI bileşeni değildir.</p></article>
+        <article class="card"><h2>İndeks Formülü</h2><div class="mini-list"><div class="mini-item vertical"><strong>CSI · C-rate</strong><span>Ortalama C-rate esas alınır; düşük güçlü DC ile yüksek güçlü DC aynı sınıfa konmaz.</span></div><div class="mini-item vertical"><strong>CSI · Şarj derinliği / ΔSOC</strong><span>Sığ şarj çevrimleri, aynı yüksek-SOC bölgede kalmadıkları sürece daha düşük cycle-stress proxy üretir.</span></div><div class="mini-item vertical"><strong>CSI · SOC penceresi</strong><span>%80–90 orta, %90–100 daha yüksek ağırlık; %20 altı yalnızca küçük ağırlık alır.</span></div><div class="mini-item vertical"><strong>CalSI · SOC×zaman</strong><span>Ortalama SOC, >%80 saat ve >%90 saat piecewise-linear zaman integraliyle tahmin edilir.</span></div><div class="mini-item vertical"><strong>CalSI · Termal bağlam</strong><span>Gerçek batarya sıcaklığı varsa doğrudan; yoksa ortam + park + ön sürüş nitel proxy olarak kullanılır.</span></div></div><p class="muted">AC/DC oranı artık BSI bileşeni değildir. EFC ve toplam throughput kümülatif maruziyet olarak ayrıca raporlanır.</p></article>
       </div>
     </section>
 
     <section id="technical-report" class="panel technical-report">
       <div class="section-title"><div><h2>NMC / LFP Teknik Raporu</h2><p>Elektronik mühendisliği perspektifiyle elektrokimya, BMS, yaşlanma ve hızlı şarj mekanizmaları.</p></div></div>
       <div class="report-hero">
-        <div><span class="report-kicker">ENGINEERING NOTE · v1</span><h2>Li-ion EV Bataryalarında NMC ve LFP: Hücre Fiziğinden BMS Kararlarına</h2><p>Bu rapor, uygulamadaki stres analizinin neden bu parametreleri izlediğini açıklamak için hazırlanmıştır. Sayısal eşikler hücre tasarımına özgü değişebileceğinden, kaynaklardaki deney sonuçları “evrensel limit” olarak değil, mekanizma ve ölçek göstergesi olarak kullanılmalıdır.</p></div>
+        <div><span class="report-kicker">ENGINEERING NOTE · v2</span><h2>Li-ion EV Bataryalarında NMC ve LFP: Hücre Fiziğinden BMS Kararlarına</h2><p>Bu rapor, uygulamadaki stres analizinin neden bu parametreleri izlediğini açıklamak için hazırlanmıştır. Sayısal eşikler hücre tasarımına özgü değişebileceğinden, kaynaklardaki deney sonuçları “evrensel limit” olarak değil, mekanizma ve ölçek göstergesi olarak kullanılmalıdır.</p></div>
       </div>
 
       <details open class="report-section"><summary>1 · Hücre mimarisi ve elektrokimyasal temel</summary><div class="report-body">
@@ -352,9 +411,9 @@
         <p>Bu değer degradation şiddeti değildir; 100 EFC düşük stresli de yüksek stresli de olabilir. Bu nedenle EFC, BSI'yi otomatik yükselten bir bileşen değil, kümülatif maruziyet göstergesidir. 2026 stress-factor çalışması da SOC, DOD, sıcaklık ve C-rate etkilerini ayrıştırmanın, tek bir toplam cycle sayısından daha açıklayıcı olduğunu vurgular.</p>
       </div></details>
 
-      <details class="report-section"><summary>12 · Uygulamadaki Battery Stress Index nasıl çalışıyor?</summary><div class="report-body">
-        <p>BSI, son ayarlanan şarj penceresindeki dört alt bileşeni enerji-ağırlıklı değerlendirir: <strong>SOC maruziyeti %35, C-rate %35, sıcaklık etkileşimi %20 ve DC enerji dengesi %10</strong>. Bunlar literatürden doğrudan alınmış regresyon katsayıları değil, kullanıcının elindeki sınırlı saha verisi için seçilmiş açıklanabilir heuristic ağırlıklardır. Veri yoksa ilgili bileşen çıkarılır ve kalan ağırlıklar normalize edilir.</p>
-        <ul><li>%20–80 arası şarja eklenen enerji SOC stresine ceza üretmez; %80–90 orta, %90–100 daha yüksek ağırlık alır.</li><li>C-rate skoru doğrusal olmayan artar; 2C üzerindeki maruziyet daha güçlü ağırlık kazanır, 4C+ en yüksek banda girer.</li><li>Soğuk + >1C ve sıcak + >80% SOC kombinasyonları sıcaklık bileşenini ağırlaştırır.</li><li>DC enerji oranı elektrokimyasal “zarar” yerine, kullanıcının tanımladığı denge hedefinden sapma olarak işlenir.</li></ul>
+      <details class="report-section"><summary>12 · Uygulamadaki CSI, CalSI ve Battery Stress Index nasıl çalışıyor?</summary><div class="report-body">
+        <p>v0.9 ile stres modeli iki fiziksel eksene ayrılmıştır. <strong>Cycle / Charge Stress Index (CSI)</strong>; enerji-ağırlıklı C-rate maruziyeti, şarj derinliği (ΔSOC) ve SOC penceresinin konumunu değerlendirir. <strong>Calendar Stress Index (CalSI)</strong> ise mümkün olduğunda SOC×zaman maruziyetini ve termal bağlamı kullanır. Genel <strong>BSI = %65 CSI + %35 CalSI</strong> olarak sunulur. Bunlar literatürden doğrudan alınmış ömür-regresyon katsayıları değil, bileşenleri açık bir saha takip indeksidir.</p>
+        <ul><li>AC/DC etiketi BSI bileşeni değildir. 50 kW DC ile 180 kW DC, ölçülen/hesaplanan C-rate'e göre farklı değerlendirilir.</li><li>%20–80 bir koruma bandıdır; %20'ye düşmeyi beklemek veya her şarjı %80'e tamamlamak zorunlu değildir. Sığ çevrimler düşük ΔSOC stresi alır.</li><li>%80–90 ve özellikle %90–100 bölgeleri, aynı ΔSOC için daha yüksek SOC-pencere ağırlığı alır.</li><li>C-rate skoru doğrusal olmayan artar; 2C üzerindeki maruziyet daha güçlü, 4C+ en yüksek banttadır.</li><li>Soğuk + yüksek C-rate ve sıcak + yüksek SOC kombinasyonları termal/calendar stresini artırır.</li><li>SOC×zaman hesabı yalnızca yeterli zaman damgalı gözlem varsa kullanılır; uzun veri boşlukları otomatik olarak kapsam dışında bırakılır.</li></ul>
         <p><strong>Önemli:</strong> BSI, SOH veya RUL değildir. Hücre iç sıcaklığı, gerçek pack current, hücre min/max gerilimleri ve BMS resistance/capacity parametreleri erişilebilir hale gelirse model fiziksel olarak çok daha güçlü hale getirilebilir.</p>
       </div></details>
 
@@ -379,6 +438,21 @@
           <a class="source-card" href="https://doi.org/10.1016/j.egyai.2026.100693" target="_blank" rel="noopener"><strong>LFP SOC observability · Energy and AI 24 (2026)</strong><span>Düz OCV–SOC bölgesinde information-aware estimator ve hysteresis modeli.</span></a>
         </div>
       </div></details>
+
+      <details class="report-section"><summary>15 · Şarj planlama: neden AC/DC etiketi yerine C-rate + SOC×zaman?</summary><div class="report-body">
+        <p>v0.9 karar motoru AC ve DC'yi doğrudan “iyi/kötü” sınıfına ayırmaz. Paket düzeyinde yaklaşık <code>C-rate ≈ P(kW)/E(kWh)</code> kullanılır. 88,5 kWh T10X için 50 kW DC ≈ 0,56C, 90 kW ≈ 1,02C ve 180 kW ≈ 2,03C'dir. Bu nedenle düşük güçlü DC, 180 kW tepe hızlı şarjla aynı stres kategorisine konmamalıdır.</p>
+        <p>2026 tarihli NMC/graphite çalışması aynı 60 puanlık SOC penceresinde 0–60% çevrimin 20–80% ve özellikle 40–100%'e göre daha yüksek çevrim kararlılığı verdiğini gösterdi. Bu bulgu, “%20’ye düşmeden şarj etme” kuralını desteklemez; daha sığ ve daha düşük ortalama SOC'li çevrimler çoğu durumda avantajlı olabilir.</p>
+        <p>Calendar aging için yalnızca “%80 üstüne çıktı mı?” yerine <strong>ne kadar süre yüksek SOC'de kaldı?</strong> sorusu önemlidir. Uygulama bu nedenle zaman damgalı SOC noktalarını birleştirerek ortalama SOC, >80% saat ve >90% saat için bir <em>SOC-time proxy</em> hesaplar. Uzun veri boşlukları entegrasyona katılmaz ve güven göstergesi düşürülür.</p>
+        <p>Termal tarafta ortam sıcaklığı gerçek pack sıcaklığı değildir. Gerçek BMS sıcaklığı girilirse önceliklidir; yoksa dış sıcaklık, park ortamı, güneş/gölge, park süresi ve şarj öncesi sürüş yalnızca nitel termal proxy üretir. Bu özellikle Ankara'nın sıcak yaz öğleden sonraları ve cold-soak kış sabahlarında önemlidir.</p>
+        <div class="source-list"><a class="source-card" href="https://doi.org/10.1016/j.jpowsour.2026.239975" target="_blank" rel="noopener"><strong>Zhiani et al. · JPS 678 (2026) 239975</strong><span>0–60 / 20–80 / 40–100 SOC pencereleri; düşük-SOC cycling en yüksek stabilite.</span></a><a class="source-card" href="https://doi.org/10.1038/s41560-023-01194-y" target="_blank" rel="noopener"><strong>Konz et al. · Nature Energy 8 (2023)</strong><span>Lithium plating onset: charge rate, SOC, sıcaklık ve hücre enerji yoğunluğunun birleşik etkisi.</span></a></div>
+      </div></details>
+
+      <details class="report-section"><summary>16 · Meteoroloji, park koşulu ve şarj zamanlaması</summary><div class="report-body">
+        <p>Batarya hücre sıcaklığı ile meteorolojik hava sıcaklığı aynı değişken değildir. Pack; sürüş yükü, termal yönetim, güneş radyasyonu, asfalt/zemin sıcaklığı ve park süresi nedeniyle ortamdan daha sıcak veya daha soğuk olabilir. Bu nedenle v0.9 otomatik hava sıcaklığını <strong>ambient thermal proxy</strong> olarak etiketler; BMS/servis üzerinden gerçek batarya sıcaklığı girilmişse onu önceliklendirir.</p>
+        <p>Planlayıcı, hareket saati belli olduğunda saatlik sıcaklık tahminini tarar. Hedef SOC ≤80 ise termal açıdan daha elverişli bir şarj penceresi ile gereksiz yüksek-SOC bekleme süresi arasında denge kurar. Hedef SOC >80 ise calendar-aging açısından şarjın hareket saatine yakın tamamlanmasını önceler. Açık hava/güneş parkı sıcak saatlerde ek risk proxy'si, uzun dış ortam parkı ise ambient verinin pack durumunu temsil etme olasılığını artıran bir güven girdisi olarak kullanılır.</p>
+        <p>iPhone konumu yalnızca hava sorgusu sırasında RAM içinde kullanılır; koordinatlar uygulama verisine veya Firebase'e yazılmaz. GitHub Pages tarayıcı ortamında stabil CORS erişimi için otomatik veri katmanı Open-Meteo ile uygulanmıştır. MGM'nin resmi saatlik tahmin sayfası referans olarak uygulamada tutulur; resmi ve dokümante edilmiş makine-okunabilir bir MGM erişimi sağlanırsa <code>WeatherProvider</code> katmanına eklenebilir.</p>
+        <div class="source-list"><a class="source-card" href="https://www.mgm.gov.tr/tahmin/saatlik.aspx?m=ANKARA" target="_blank" rel="noopener"><strong>Meteoroloji Genel Müdürlüğü · Ankara saatlik tahmin</strong><span>Resmi Türkiye meteoroloji referansı; uygulamada kullanıcı tarafından açılabilir.</span></a><a class="source-card" href="https://open-meteo.com/en/docs" target="_blank" rel="noopener"><strong>Open-Meteo Forecast API</strong><span>Tarayıcıdan otomatik mevcut/saatlik sıcaklık verisi için kullanılan makine-okunabilir katman.</span></a></div>
+      </div></details>
     </section>
 
     <section id="knowledge" class="panel">
@@ -398,27 +472,27 @@
         <article class="card">
           <h2>3. Hızlı şarj sıklığı ve kimya</h2>
           <p>2025 Journal of Power Sources çalışması ticari NMC, NCA ve LFP hücrelerde hızlı/yavaş şarj karışımlarını karşılaştırdı. Eşit kullanımda daha fazla hızlı şarj genel olarak daha düşük kapasiteyle ilişkilendirildi ve etkinin kimyaya göre değiştiği gösterildi.</p>
-          <p><strong>Uygulama kuralı:</strong> DC kullanımını yasaklamak yerine, son şarjlardaki DC enerji payını izleriz. Varsayılan hedef %40'tır; bu oran literatürde tanımlanmış tıbbi/teknik bir eşik değil, kullanıcıya denge sağlayan muhafazakâr bir takip hedefidir.</p>
+          <p><strong>Uygulama kuralı:</strong> AC/DC yalnızca kullanım istatistiğidir. Sağlık ve stres motoru doğrudan C-rate bantlarını kullanır; örneğin 50 kW DC (~0,56C) ile 180 kW DC (~2,03C) aynı stres sınıfında değerlendirilmez.</p>
           <p><a href="https://doi.org/10.1016/j.jpowsour.2025.237552" target="_blank" rel="noopener">Morin, Whitacre & Michalek, Journal of Power Sources, 2025</a></p>
         </article>
         <article class="card">
           <h2>4. SOC ve takvim yaşlanması</h2>
-          <p>NMC tabanlı hücrelerde yüksek SOC'de bekletme ve yüksek sıcaklık, takvim yaşlanmasını artırabilen önemli etkenlerdir. Bu nedenle uygulama %20–80 tercih bandını ve özellikle %80 üzerindeki şarj miktarını ayrı izler.</p>
+          <p>NMC tabanlı hücrelerde yüksek SOC'de bekletme ve yüksek sıcaklık, takvim yaşlanmasını artırabilen önemli etkenlerdir. Bu nedenle uygulama %20–80 koruma bandını, yüksek-SOC şarj enerjisini ve yeterli zaman damgası olduğunda >%80 / >%90 SOC’de geçirilen süreyi ayrı izler.</p>
           <p><strong>Uygulama kuralı:</strong> %80 üzerine çıkmak “yasak” değildir; ihtiyaç yoksa yüksek SOC'de uzun süre bekletmekten kaçınmaya yönelik uyarı üretir.</p>
-          <p><a href="https://doi.org/10.1016/j.jpowsour.2025.238482" target="_blank" rel="noopener">Journal of Power Sources, 2025 – battery degradation quantitative review</a></p>
+          <p><a href="https://doi.org/10.1016/j.tsep.2024.102436" target="_blank" rel="noopener">Saeed et al., Thermal Science and Engineering Progress, 2024 – calendar aging</a></p>
         </article>
         <article class="card">
           <h2>5. Batarya Sağlık Skoru</h2>
-          <p>Skor dört açıklanabilir bileşenden oluşur: ölçülmüş SOH, %20–80 SOC disiplini, C-rate/şarj stresi ve seçilen DC enerji payı hedefi. Yeterli SOH verisi yoksa mevcut bileşenlerin ağırlıkları yeniden normalize edilir ve güven seviyesi düşürülür.</p>
+          <p>Skor, ölçülmüş SOH ile SOC çalışma profili, cycle/charge stresi ve termal bağlamı birleştirir. AC/DC oranı skor bileşeni değildir. SOC×zaman verisi yeterli olduğunda yüksek SOC’de bekleme davranışı da değerlendirmeye katılır.</p>
           <p><strong>Önemli:</strong> Bu puan bir laboratuvar veya BMS sağlık ölçümü değildir; kullanım alışkanlıklarını ve saha SOH testlerini tek ekranda izlemek için oluşturulmuş karar destek göstergesidir.</p>
         </article>
         <article class="card">
-          <h2>5. SOH hesabı nasıl yapılıyor?</h2>
+          <h2>6. SOH hesabı nasıl yapılıyor?</h2>
           <p>SOH testi, şarj cihazından alınan enerjiyi tahmini şarj kaybıyla düzelterek bataryaya giden net enerjiyi bulur; bunu SOC farkına ölçekleyerek tahmini kullanılabilir kapasiteyi hesaplar. SOH = tahmini kapasite / referans kapasite.</p>
           <p><strong>Kalite puanı:</strong> SOC farkı ≥60 puan, AC şarj ve 15–30 °C civarı testler daha yüksek güvenilirlik alır. Sonuç, BMS diagnostik ölçümünün yerine geçmez.</p>
         </article>
       </div>
-      <div class="info-box"><strong>Bilimsel sınır:</strong> Literatür “iki DC'den sonra üç AC” gibi bir zorunluluk tanımlamaz. Uygulamanın “kaç AC gerekli?” önerisi, sizin seçtiğiniz DC enerji payı hedefine dönmek için gereken AC enerjisini matematiksel olarak hesaplayan bir kullanım koçudur.</div>
+      <div class="info-box"><strong>Bilimsel sınır:</strong> Literatür “iki DC'den sonra üç AC” gibi bir zorunluluk tanımlamaz. v0.9 ile bu davranış kaldırılmıştır. Öneriler artık C-rate, SOC penceresi, SOC×zaman, gerçek/temsili termal durum ve planlanan enerji ihtiyacına dayanır.</div>
     </section>
 
     <section id="settings" class="panel">
@@ -435,10 +509,11 @@
         <label>Referans Kapasite (kWh)<input id="referenceCapacity" type="number" min="1" step="0.1"></label>
         <label>Tercih Edilen Alt SOC (%)<input id="preferredMinSoc" type="number" min="0" max="100" step="1"></label>
         <label>Tercih Edilen Üst SOC (%)<input id="preferredMaxSoc" type="number" min="0" max="100" step="1"></label>
-        <label>Hedef Maksimum DC Enerji Payı (%)<input id="targetDcShare" type="number" min="5" max="100" step="1"></label>
-        <label>Denge Analizi Penceresi (son kaç şarj?)<input id="balanceWindow" type="number" min="3" max="50" step="1"></label>
         <label>Stres Analizi Penceresi (son kaç şarj?)<input id="stressWindow" type="number" min="3" max="100" step="1"></label>
-        <p class="muted">Sahiplik başlangıç km'si, önceki sahibin kullanımını sizin davranış skorunuzdan ayırmak içindir. Varsayılan %40 DC hedefi bilimsel bir “zarar eşiği” değil; DC'yi yasaklamadan AC/DC kullanım dengesini takip etmek için ayarlanabilir bir kullanım hedefidir. 88,5 kWh nominal referanstır; doğrulanmış kullanılabilir kapasite elde edilirse SOH için referans kapasiteyi güncelleyin.</p>
+        <label>Planlayıcı Varsayılan Rezerv SOC (%)<input id="plannerReserveDefault" type="number" min="0" max="40" step="1"></label>
+        <label>Planlayıcı Varsayılan Güvenlik Payı (%)<input id="plannerMarginDefault" type="number" min="0" max="50" step="1"></label>
+        <label>MGM Referans Şehri<input id="mgmCity" type="text" placeholder="ANKARA"></label>
+        <p class="muted">Sahiplik başlangıç km'si önceki sahibin kullanımını sizin analizinizden ayırır. %20–80 alanları artık “koruma bandı” olarak kullanılır; uygulama sizi %20’ye düşmeyi beklemeye veya her seferinde %80’e çıkmaya zorlamaz. AC/DC oranı sağlık skorunda kullanılmaz; C-rate ve termal bağlam esas alınır. 88,5 kWh nominal referanstır; doğrulanmış kullanılabilir kapasite elde edilirse SOH referansını güncelleyin.</p>
         <div class="form-actions"><button type="submit">Ayarları Kaydet</button><button type="button" id="clearAllBtn" class="danger">Tüm Verileri Sil</button></div>
       </form>
 
@@ -462,9 +537,10 @@
     </section>
   </main>
 
-  <footer>v0.8.8A · Premium / Apple · Engineer Edition · Tek kullanıcı giriş kapısı · Firebase Sync · GitHub Pages · iPhone uyumlu · km/SOC eksik geçmiş kayıt desteği · süre→ortalama güç/C-rate</footer>
+  <footer>v0.9.0 · Premium / Apple · Charge Planner · Engineer Edition · Tek kullanıcı giriş kapısı · Firebase Sync · GitHub Pages · iPhone uyumlu · km/SOC eksik geçmiş kayıt desteği · süre→ortalama güç/C-rate</footer>
   </div>
 
+  <script src="weather.js"></script>
   <script src="app.js"></script>
   <script type="module" src="firebase-sync.js"></script>
   <script>

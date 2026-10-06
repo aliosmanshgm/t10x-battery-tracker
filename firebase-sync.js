@@ -62,6 +62,7 @@ function meaningful(data) {
     data?.trips?.length ||
     data?.consumptionSnapshots?.length ||
     data?.sohTests?.length ||
+    data?.socSnapshots?.length ||
     data?.meta?.updatedAt
   );
 }

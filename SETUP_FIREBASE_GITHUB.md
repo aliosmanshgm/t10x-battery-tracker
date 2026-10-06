@@ -1,4 +1,4 @@
-# Firebase + GitHub Pages Kurulum Kontrol Listesi — v0.8.2
+# Firebase + GitHub Pages Kurulum Kontrol Listesi — v0.9.0
 
 ## 1. Tamamlananlar
 - Firebase projesi: `t10x-battery-tracker`
@@ -48,13 +48,13 @@ Yayın URL'si genellikle:
 
 ## 8. İlk iPhone testi
 Safari'de GitHub Pages URL'sini açın.
-Ayarlar > Firebase Bulut Senkronizasyonu bölümünde hesap oluşturun/giriş yapın.
+Firebase Console’da tanımlı tek kullanıcı hesabınızla giriş yapın.
 Senkronizasyon doğrulandıktan sonra Safari Paylaş > Ana Ekrana Ekle ile PWA gibi kullanabilirsiniz.
 
 ## 9. Veri güvenliği
 Firebase web config istemci tarafında görünür. Gerçek erişim kontrolü Authentication + Realtime Database Security Rules ile sağlanır.
 
-## Tek kullanıcı modu (v0.8.2)
+## Tek kullanıcı modu (v0.9.0)
 
 Bu sürümde uygulama giriş yapılmadan açılmaz ve web arayüzünde **Hesap Oluştur** seçeneği yoktur.
 
@@ -66,4 +66,12 @@ Bu sürümde uygulama giriş yapılmadan açılmaz ve web arayüzünde **Hesap O
 
 Bu kural, veritabanını yalnızca o UID'ye kilitler. Başka bir Firebase hesabı oluşturulsa dahi T10X veritabanını okuyamaz veya yazamaz.
 
-GitHub'a v0.8.2 dosyalarını yükledikten sonra önceki service worker önbelleği nedeniyle eski ekranı görürseniz sayfayı yenileyin. Ana ekrana eklenmiş iPhone sürümünde uygulamayı tamamen kapatıp yeniden açmak da yeni service worker'ın devreye girmesini hızlandırır.
+GitHub'a v0.9.0 dosyalarını yükledikten sonra önceki service worker önbelleği nedeniyle eski ekranı görürseniz sayfayı yenileyin. Ana ekrana eklenmiş iPhone sürümünde uygulamayı tamamen kapatıp yeniden açmak da yeni service worker'ın devreye girmesini hızlandırır.
+
+
+## v0.9.0 ek notlar
+- `weather.js` GitHub Pages üzerinde otomatik hava sorgusu için gereklidir; repo kökünde tutulmalıdır.
+- Konum izni yalnızca HTTPS/GitHub Pages (ve localhost geliştirme ortamı) üzerinde çalışır.
+- Uygulama konum koordinatlarını Firebase veri modeline yazmaz.
+- MGM resmi sayfası referans bağlantısıdır; tarayıcıdan otomatik sıcaklık için Open-Meteo kullanılır.
+- Eski v0.8 verileri uygulama tarafından şema 10'a migrate edilir. JSON yedeğini yine de koruyun.
