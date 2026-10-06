@@ -1,5 +1,5 @@
-const STORAGE_KEY='t10xBatteryTracker_v8';
-const LEGACY_KEYS=['t10xBatteryTracker_v6','t10xBatteryTracker_v5','t10xBatteryTracker_v4','t10xBatteryTracker_v3','t10xBatteryTracker_v2','t10xBatteryTracker_v1'];
+const STORAGE_KEY='t10xBatteryTracker_v9';
+const LEGACY_KEYS=['t10xBatteryTracker_v8','t10xBatteryTracker_v6','t10xBatteryTracker_v5','t10xBatteryTracker_v4','t10xBatteryTracker_v3','t10xBatteryTracker_v2','t10xBatteryTracker_v1'];
 const DEFAULT_PROVIDERS=[
   "ZES Şarj",
   "Trugo Şarj",
@@ -163,11 +163,11 @@ const DEFAULT_PROVIDERS=[
   "Ev / Kendi AC Şarjım"
 ];
 const defaults={
-  meta:{schemaVersion:8,updatedAt:''},
+  meta:{schemaVersion:9,updatedAt:''},
   settings:{
     vehicleName:'T10X Uzun Menzil',batteryChemistry:'NMC',ownershipStartOdo:32356,ownershipStartSoc:59,ownershipStartDate:'',trackingStartOdo:33537,currentOdo:33537,currentSoc:76,
     referenceCapacity:88.5,preferredMinSoc:20,preferredMaxSoc:80,
-    targetDcShare:40,balanceWindow:10
+    targetDcShare:40,balanceWindow:10,stressWindow:12
   },
   providers:[...DEFAULT_PROVIDERS],
   charges:[],trips:[],consumptionSnapshots:[],sohTests:[]
@@ -181,7 +181,7 @@ const domIds=[
   'tripForm','tripId','tripDate','tripDistance','tripConsumption','tripStartSoc','tripEndSoc','tripTemp','tripRoute','tripNotes','tripReset',
   'sohForm','sohDate','sohStartSoc','sohEndSoc','sohEnergy','sohType','sohLoss','sohTemp','sohOdo','sohNotes',
   'crateForm','crateCapacity','cratePower','crateStartSoc','crateEndSoc','crateTemp',
-  'settingsForm','vehicleName','batteryChemistry','ownershipStartOdo','ownershipStartSoc','ownershipStartDate','trackingStartOdo','currentOdo','currentSoc','referenceCapacity','preferredMinSoc','preferredMaxSoc','targetDcShare','balanceWindow','clearAllBtn',
+  'settingsForm','vehicleName','batteryChemistry','ownershipStartOdo','ownershipStartSoc','ownershipStartDate','trackingStartOdo','currentOdo','currentSoc','referenceCapacity','preferredMinSoc','preferredMaxSoc','targetDcShare','balanceWindow','stressWindow','clearAllBtn',
   'quickStatusForm','quickCurrentOdo','quickCurrentSoc','providerNew','providerAddBtn','providerResetBtn','providerManager',
   'exportJsonBtn','importJsonInput','exportChargesCsv','exportConsumptionCsv','exportTripsCsv'
 ];
@@ -189,7 +189,7 @@ const D=Object.fromEntries(domIds.map(id=>[id,byId(id)]));
 
 function migrate(obj){
   const out={...structuredClone(defaults),...(obj||{})};
-  out.meta={...structuredClone(defaults.meta),...(obj?.meta||{}),schemaVersion:8};
+  out.meta={...structuredClone(defaults.meta),...(obj?.meta||{}),schemaVersion:9};
   out.settings={...structuredClone(defaults.settings),...(obj?.settings||{})};
   if(obj?.settings&&obj.settings.ownershipStartSoc==null){
     if(Number(out.settings.ownershipStartOdo)===32000)out.settings.ownershipStartOdo=32356;
@@ -211,14 +211,14 @@ function load(){
   }catch{return structuredClone(defaults)}
 }
 function persistLocal({emit=false}={}){localStorage.setItem(STORAGE_KEY,JSON.stringify(db));renderAll();if(emit)window.dispatchEvent(new CustomEvent('t10x:data-changed',{detail:{db:structuredClone(db)}}));}
-function save(){db.meta={...(db.meta||{}),schemaVersion:8,updatedAt:new Date().toISOString()};persistLocal({emit:true})}
+function save(){db.meta={...(db.meta||{}),schemaVersion:9,updatedAt:new Date().toISOString()};persistLocal({emit:true})}
 
 window.T10XApp={
   getData:()=>structuredClone(db),
   replaceData:(next,{emit=false}={})=>{db=migrate(next||{});persistLocal({emit});return structuredClone(db)},
   hasMeaningfulData:()=>Boolean(db.charges.length||db.trips.length||db.consumptionSnapshots.length||db.sohTests.length||db.meta?.updatedAt),
   storageKey:STORAGE_KEY,
-  schemaVersion:8
+  schemaVersion:9
 };
 
 function uid(){return crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random())}
@@ -367,6 +367,102 @@ function batteryHealthScore(){
   return{score,components,confidence,confidenceClass,summary};
 }
 
+
+function chargeSocBandFraction(c,low,high){
+  if(!hasSocPair(c))return null;
+  const a=Number(c.startSoc),b=Number(c.endSoc),delta=b-a;
+  if(!(delta>0))return null;
+  return Math.max(0,Math.min(b,high)-Math.max(a,low))/delta;
+}
+function chargeSocStress(c){
+  if(!hasSocPair(c))return null;
+  const fLow=chargeSocBandFraction(c,0,20)||0;
+  const f80=chargeSocBandFraction(c,80,90)||0;
+  const f90=chargeSocBandFraction(c,90,100)||0;
+  return clamp(fLow*8+f80*50+f90*100);
+}
+function cRateStressValue(c){
+  const ar=chargeAverageCRate(c),pr=chargePeakCRate(c),r=ar??pr;
+  if(r==null)return null;
+  let v;
+  if(r<=0.5)v=0;
+  else if(r<=1)v=(r-.5)/.5*15;
+  else if(r<=2)v=15+(r-1)*25;
+  else if(r<=4)v=40+(r-2)/2*45;
+  else v=Math.min(100,85+(r-4)*7.5);
+  if(ar!=null&&pr!=null&&pr>2)v+=Math.min(10,Math.max(0,pr-2)*5);
+  return clamp(v);
+}
+function tempStressValue(c){
+  if(c.temp===null||c.temp===''||c.temp===undefined||!Number.isFinite(Number(c.temp)))return null;
+  const t=Number(c.temp),r=chargeCRate(c);let v=0;
+  if(t<0)v=65;else if(t<10)v=35;else if(t<15)v=15;else if(t<=30)v=0;else if(t<35)v=10;else if(t<40)v=30;else if(t<45)v=50;else v=70;
+  if(t<=10&&r!=null&&r>1)v+=Math.min(35,10+(r-1)*20);
+  if(t>=35&&hasSocValue(c.endSoc)&&Number(c.endSoc)>80)v+=20;
+  return clamp(v);
+}
+function weightedStressMean(charges,fn){
+  const valid=charges.map(x=>({x,v:fn(x),e:chargeEnergyValue(x)})).filter(o=>o.v!=null&&Number.isFinite(o.v));
+  if(!valid.length)return null;
+  const e=sum(valid.map(o=>o.e));
+  return e>0?sum(valid.map(o=>o.v*o.e))/e:avg(valid.map(o=>o.v));
+}
+function stressCoverageFor(charges){
+  const total=sum(charges.map(chargeEnergyValue));
+  const cov=(pred)=>{const e=sum(charges.filter(pred).map(chargeEnergyValue));return total>0?e/total*100:(charges.length?charges.filter(pred).length/charges.length*100:0)};
+  const soc=cov(hasSocPair),crate=cov(x=>chargeCRate(x)!=null),temp=cov(x=>x.temp!==null&&x.temp!==''&&x.temp!==undefined&&Number.isFinite(Number(x.temp)));
+  const weighted=soc*.4+crate*.4+temp*.2;
+  const confidence=weighted>=80?'Yüksek':weighted>=50?'Orta':'Düşük';
+  const cls=weighted>=80?'good':weighted>=50?'info':'warn';
+  return{soc,crate,temp,weighted,confidence,cls};
+}
+function stressIndexFor(charges){
+  if(!charges.length)return{score:null,components:[],coverage:stressCoverageFor([]),summary:'Stres hesabı için şarj kaydı ekleyin.'};
+  const components=[];
+  const soc=weightedStressMean(charges,chargeSocStress);if(soc!=null)components.push({key:'soc',label:'Yüksek / düşük SOC maruziyeti',score:soc,weight:35,detail:'%80–90 orta, %90–100 daha yüksek ağırlık; %20 altı düşük ağırlık.'});
+  const cr=weightedStressMean(charges,cRateStressValue);if(cr!=null)components.push({key:'crate',label:'C-rate maruziyeti',score:cr,weight:35,detail:'Ortalama C-rate esas; varsa tepe C-rate sınırlı ek stres.'});
+  const ts=weightedStressMean(charges,tempStressValue);if(ts!=null)components.push({key:'temp',label:'Sıcaklık etkileşimi',score:ts,weight:20,detail:'Ortam sıcaklığı proxy; soğuk+hızlı ve sıcak+yüksek SOC ağırlaştırılır.'});
+  const total=sum(charges.map(chargeEnergyValue)),dc=sum(charges.filter(x=>x.type==='DC').map(chargeEnergyValue));
+  const dcShare=total>0?dc/total*100:(charges.length?charges.filter(x=>x.type==='DC').length/charges.length*100:0),target=Number(db.settings.targetDcShare)||40;
+  const dcStress=dcShare<=target?0:clamp((dcShare-target)/Math.max(1,100-target)*100);
+  components.push({key:'dc',label:'DC enerji dengesi',score:dcStress,weight:10,detail:`DC payı %${fmt(dcShare,1)} · kullanıcı hedefi ≤%${fmt(target,0)}; bilimsel zarar eşiği değildir.`});
+  const w=sum(components.map(x=>x.weight)),score=w?sum(components.map(x=>x.score*x.weight))/w:null;
+  const coverage=stressCoverageFor(charges);
+  const summary=score==null?'Veri yetersiz':score<20?'Düşük stresli kullanım profili':score<40?'Ilımlı stresli kullanım profili':score<60?'Orta-yüksek stres maruziyeti':score<80?'Yüksek stres maruziyeti':'Çok yüksek stres maruziyeti';
+  return{score,components,coverage,summary,dcShare};
+}
+function batteryStressIndex(){
+  const ordered=[...ownerCharges()].sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  const n=Math.max(3,Number(db.settings.stressWindow)||12);
+  return{recent:stressIndexFor(ordered.slice(0,n)),lifetime:stressIndexFor(ordered),window:n,recentCount:Math.min(n,ordered.length)};
+}
+function lifetimeExposureMetrics(){
+  const c=ownerCharges(),cap=Number(db.settings.referenceCapacity)||88.5,total=sum(c.map(chargeEnergyValue));
+  const weightedRateNumer=sum(c.map(x=>(chargeCRate(x)??0)*chargeEnergyValue(x))),rateEnergy=sum(c.filter(x=>chargeCRate(x)!=null).map(chargeEnergyValue));
+  const highSocEnergy=sum(c.map(x=>{const f=chargeSocBandFraction(x,80,100);return f==null?0:chargeEnergyValue(x)*f}));
+  const above90Energy=sum(c.map(x=>{const f=chargeSocBandFraction(x,90,100);return f==null?0:chargeEnergyValue(x)*f}));
+  const lowSocEnergy=sum(c.map(x=>{const f=chargeSocBandFraction(x,0,20);return f==null?0:chargeEnergyValue(x)*f}));
+  const fast1=sum(c.filter(x=>(chargeCRate(x)??0)>1).map(chargeEnergyValue));
+  const fast2=sum(c.filter(x=>(chargeCRate(x)??0)>2).map(chargeEnergyValue));
+  const dc=sum(c.filter(x=>x.type==='DC').map(chargeEnergyValue));
+  const coldFast=sum(c.filter(x=>Number.isFinite(Number(x.temp))&&Number(x.temp)<=10&&(chargeCRate(x)??0)>1).map(chargeEnergyValue));
+  const hotHigh=sum(c.filter(x=>Number.isFinite(Number(x.temp))&&Number(x.temp)>=35&&hasSocValue(x.endSoc)&&Number(x.endSoc)>80).map(chargeEnergyValue));
+  const avgRates=c.map(chargeAverageCRate).filter(x=>x!=null),peakRates=c.map(chargePeakCRate).filter(x=>x!=null);
+  return{total,chargeEfc:cap>0?total/cap:null,dc,dcShare:total?dc/total*100:null,highSocEnergy,highSocShare:total?highSocEnergy/total*100:null,above90Energy,lowSocEnergy,fast1,fast1Share:total?fast1/total*100:null,fast2,fast2Share:total?fast2/total*100:null,coldFast,hotHigh,avgRate:rateEnergy?weightedRateNumer/rateEnergy:null,maxAvg:avgRates.length?Math.max(...avgRates):null,maxPeak:peakRates.length?Math.max(...peakRates):null,coverage:stressCoverageFor(c)};
+}
+function socBandEnergy(charges){
+  const bands=[['0–20%',0,20],['20–40%',20,40],['40–60%',40,60],['60–80%',60,80],['80–90%',80,90],['90–100%',90,100]],out={};
+  for(const [label,a,b] of bands){out[label]=sum(charges.map(x=>{const f=chargeSocBandFraction(x,a,b);return f==null?0:chargeEnergyValue(x)*f}))}return out;
+}
+function cRateBandEnergy(charges){
+  const out={'≤0,5C':0,'0,5–1C':0,'1–2C':0,'2–4C':0,'≥4C':0,'C-rate bilinmiyor':0};
+  for(const x of charges){const e=chargeEnergyValue(x),r=chargeCRate(x);if(r==null)out['C-rate bilinmiyor']+=e;else if(r<=.5)out['≤0,5C']+=e;else if(r<=1)out['0,5–1C']+=e;else if(r<=2)out['1–2C']+=e;else if(r<4)out['2–4C']+=e;else out['≥4C']+=e}return out;
+}
+function tempBandEnergy(charges){
+  const out={'<0 °C':0,'0–10 °C':0,'10–15 °C':0,'15–30 °C':0,'30–35 °C':0,'35–40 °C':0,'≥40 °C':0,'Sıcaklık bilinmiyor':0};
+  for(const x of charges){const e=chargeEnergyValue(x);if(x.temp===null||x.temp===''||x.temp===undefined||!Number.isFinite(Number(x.temp))){out['Sıcaklık bilinmiyor']+=e;continue}const t=Number(x.temp);if(t<0)out['<0 °C']+=e;else if(t<10)out['0–10 °C']+=e;else if(t<15)out['10–15 °C']+=e;else if(t<=30)out['15–30 °C']+=e;else if(t<35)out['30–35 °C']+=e;else if(t<40)out['35–40 °C']+=e;else out['≥40 °C']+=e}return out;
+}
+
 function balanceStats(){
   const win=Math.max(3,Number(db.settings.balanceWindow)||10);
   const owner=ownerCharges();
@@ -403,6 +499,7 @@ function recommendation(){
 
 function group(arr,keyFn,valueKey){const m={};for(const x of arr){const k=keyFn(x);m[k]=(m[k]||0)+(valueKey?Number(x[valueKey])||0:1)}return m}
 function renderBars(id,obj,suffix=''){const el=byId(id);const entries=Object.entries(obj).sort((a,b)=>b[1]-a[1]);if(!entries.length){el.innerHTML='<div class="empty">Veri yok.</div>';return}const max=Math.max(...entries.map(x=>x[1]),1);el.innerHTML=entries.slice(0,8).map(([k,v])=>`<div class="bar-row"><div class="bar-label"><span>${escapeHtml(k)}</span><strong>${fmt(v,1)}${suffix}</strong></div><div class="bar-track"><div class="bar-fill" style="width:${v/max*100}%"></div></div></div>`).join('')}
+function renderBarsOrdered(id,obj,suffix=''){const el=byId(id),entries=Object.entries(obj);if(!entries.length){el.innerHTML='<div class="empty">Veri yok.</div>';return}const max=Math.max(...entries.map(x=>x[1]),1);el.innerHTML=entries.map(([k,v])=>`<div class="bar-row"><div class="bar-label"><span>${escapeHtml(k)}</span><strong>${fmt(v,1)}${suffix}</strong></div><div class="bar-track"><div class="bar-fill" style="width:${v/max*100}%"></div></div></div>`).join('')}
 
 function renderDashboard(){
   const c=ownerCharges(),t=db.trips,soh=referenceSoh(),cons=latestConsumptionSnapshot(),cost100=costPer100Metrics();
@@ -431,6 +528,14 @@ function renderDashboard(){
   byId('healthScoreSummary').innerHTML=`<strong>${hs.summary}</strong>${hs.score!=null?`<div class="muted">Toplam skor ${fmt(hs.score,1)}/100</div>`:''}`;
   byId('healthScoreGauge').style.setProperty('--score',hs.score==null?0:hs.score);
   byId('healthScoreComponents').innerHTML=hs.components.length?hs.components.map(x=>`<div class="score-component"><div class="bar-label"><span>${escapeHtml(x.label)}</span><strong>${fmt(x.score,0)}</strong></div><div class="bar-track"><div class="bar-fill" style="width:${x.score}%"></div></div><div class="component-detail">${escapeHtml(x.detail)}</div></div>`).join(''):'<div class="empty">Skor için veri ekleyin.</div>';
+  const bsi=batteryStressIndex(),sr=bsi.recent,life=lifetimeExposureMetrics();
+  byId('stressScoreValue').textContent=sr.score==null?'—':fmt(sr.score,0);
+  byId('stressConfidence').textContent=`Güven: ${sr.coverage.confidence}`;byId('stressConfidence').className=`badge ${sr.coverage.cls}`;
+  byId('stressScoreSummary').innerHTML=`<strong>${sr.summary}</strong>${sr.score!=null?`<div class="muted">Son ${bsi.recentCount} şarj · ${fmt(sr.score,1)}/100 · düşük daha iyi</div>`:''}`;
+  byId('stressScoreGauge').style.setProperty('--score',sr.score==null?0:sr.score);
+  byId('stressScoreComponents').innerHTML=sr.components.length?sr.components.map(x=>`<div class="score-component"><div class="bar-label"><span>${escapeHtml(x.label)}</span><strong>${fmt(x.score,0)}</strong></div><div class="bar-track stress-track"><div class="bar-fill stress-fill" style="width:${x.score}%"></div></div><div class="component-detail">${escapeHtml(x.detail)}</div></div>`).join(''):'<div class="empty">Stres analizi için veri ekleyin.</div>';
+  byId('lifetimeExposureSummary').innerHTML=`<div class="mini-list"><div class="mini-item"><span>Toplam şarj throughput</span><strong>${fmt(life.total,1)} kWh</strong></div><div class="mini-item"><span>Charge-side EFC proxy</span><strong>${life.chargeEfc!=null?fmt(life.chargeEfc,1):'—'}</strong></div><div class="mini-item"><span>DC enerji</span><strong>${fmt(life.dc,1)} kWh${life.dcShare!=null?' · %'+fmt(life.dcShare,1):''}</strong></div><div class="mini-item"><span>>1C enerji</span><strong>${fmt(life.fast1,1)} kWh${life.fast1Share!=null?' · %'+fmt(life.fast1Share,1):''}</strong></div><div class="mini-item"><span>>80% SOC bandında eklenen enerji</span><strong>${fmt(life.highSocEnergy,1)} kWh${life.highSocShare!=null?' · %'+fmt(life.highSocShare,1):''}</strong></div></div>`;
+
   const ownKm=ownershipKm(),ownerHistory=c.filter(x=>x.scope==='owner_history').length,prev=db.charges.filter(x=>x.scope==='previous_owner').length;
   byId('ownershipSummary').innerHTML=`<div class="mini-list"><div class="mini-item"><span>Sahiplik başlangıcı</span><strong>${db.settings.ownershipStartOdo?fmt(db.settings.ownershipStartOdo,0)+' km':'-'} · %${db.settings.ownershipStartSoc??'-'}${db.settings.ownershipStartDate?' · '+fmtDate(db.settings.ownershipStartDate):''}</strong></div><div class="mini-item"><span>Güncel durum</span><strong>${latestOdo()?fmt(latestOdo(),0)+' km':'-'} · %${db.settings.currentSoc??'-'}</strong></div><div class="mini-item"><span>Sizin dönemde izlenen mesafe</span><strong>${ownKm!=null?fmt(ownKm,0)+' km':'-'}</strong></div><div class="mini-item"><span>Sizin şarj kayıtlarınız</span><strong>${c.length}</strong></div><div class="mini-item"><span>Sonradan girilen geçmiş kayıt</span><strong>${ownerHistory}</strong></div>${prev?`<div class="mini-item"><span>Önceki sahip kaydı</span><strong>${prev}</strong></div>`:''}</div>`;
   const detailedAvg=weightedTripConsumption();
@@ -493,6 +598,39 @@ function renderCrate(){
   byId('crateThresholds').innerHTML=`<div class="mini-list">${thresholds.map(x=>`<div class="mini-item vertical"><strong>${x[0]} · ${x[1]}</strong><span>${x[2]}</span></div>`).join('')}</div>`;
 }
 
+
+function renderStress(){
+  const c=ownerCharges(),bsi=batteryStressIndex(),r=bsi.recent,l=bsi.lifetime,e=lifetimeExposureMetrics();
+  const cards=[
+    ['Son Dönem BSI',r.score!=null?fmt(r.score,1)+'/100':'—',`Son ${bsi.recentCount}/${bsi.window} şarj · düşük daha iyi`],
+    ['Tüm Kayıt BSI',l.score!=null?fmt(l.score,1)+'/100':'—','Tüm sahiplik kayıtları'],
+    ['Charge-side EFC',e.chargeEfc!=null?fmt(e.chargeEfc,1):'—','Σ şarj kWh / referans kWh'],
+    ['DC Throughput',fmt(e.dc,1)+' kWh',e.dcShare!=null?'%'+fmt(e.dcShare,1)+' toplam enerji':'—'],
+    ['>1C Throughput',fmt(e.fast1,1)+' kWh',e.fast1Share!=null?'%'+fmt(e.fast1Share,1)+' toplam enerji':'—'],
+    ['>2C Throughput',fmt(e.fast2,1)+' kWh',e.fast2Share!=null?'%'+fmt(e.fast2Share,1)+' toplam enerji':'—'],
+    ['>80% SOC Enerji',fmt(e.highSocEnergy,1)+' kWh',e.highSocShare!=null?'%'+fmt(e.highSocShare,1)+' kayıtlı şarj enerjisi':'SOC verisi gerekli'],
+    ['Enerji-ağırlıklı C-rate',e.avgRate!=null?fmt(e.avgRate,2)+'C':'—','C-rate verisi olan oturumlar']
+  ];
+  byId('stressCards').innerHTML=cards.map(x=>`<div class="metric"><div class="label">${x[0]}</div><div class="value">${x[1]}</div><div class="sub">${x[2]}</div></div>`).join('');
+  byId('stressPanelValue').textContent=r.score==null?'—':fmt(r.score,0);byId('stressPanelGauge').style.setProperty('--score',r.score==null?0:r.score);
+  byId('stressPanelConfidence').textContent=`Güven: ${r.coverage.confidence}`;byId('stressPanelConfidence').className=`badge ${r.coverage.cls}`;
+  byId('stressPanelSummary').innerHTML=`<strong>${r.summary}</strong>${r.score!=null?`<div class="muted">BSI ${fmt(r.score,1)}/100 · son ${bsi.recentCount} şarj</div>`:''}`;
+  byId('stressPanelComponents').innerHTML=r.components.length?r.components.map(x=>`<div class="score-component"><div class="bar-label"><span>${escapeHtml(x.label)}</span><strong>${fmt(x.score,0)}</strong></div><div class="bar-track stress-track"><div class="bar-fill stress-fill" style="width:${x.score}%"></div></div><div class="component-detail">${escapeHtml(x.detail)}</div></div>`).join(''):'<div class="empty">Veri yok.</div>';
+  byId('stressCoverage').innerHTML=`<div class="mini-list"><div class="mini-item"><span>SOC veri kapsamı</span><strong>%${fmt(e.coverage.soc,0)}</strong></div><div class="mini-item"><span>C-rate veri kapsamı</span><strong>%${fmt(e.coverage.crate,0)}</strong></div><div class="mini-item"><span>Sıcaklık veri kapsamı</span><strong>%${fmt(e.coverage.temp,0)}</strong></div><div class="mini-item"><span>Toplam güven göstergesi</span><strong><span class="badge ${e.coverage.cls}">${e.coverage.confidence}</span></strong></div></div><p class="muted">Kapsam enerji-ağırlıklı hesaplanır. Özellikle geçmiş SOC/sıcaklık eksikleri bilinmeyen kabul edilir; kötü kullanım sayılmaz.</p>`;
+  renderBarsOrdered('stressSocBands',socBandEnergy(c),' kWh');
+  renderBarsOrdered('stressCRateBands',cRateBandEnergy(c),' kWh');
+  renderBarsOrdered('stressTempBands',tempBandEnergy(c),' kWh');
+  byId('stressThroughput').innerHTML=`<div class="mini-list"><div class="mini-item"><span>Toplam enerji</span><strong>${fmt(e.total,1)} kWh</strong></div><div class="mini-item"><span>Charge-side EFC proxy</span><strong>${e.chargeEfc!=null?fmt(e.chargeEfc,2):'—'}</strong></div><div class="mini-item"><span>%80–100 bandında eklenen enerji</span><strong>${fmt(e.highSocEnergy,1)} kWh</strong></div><div class="mini-item"><span>%90–100 bandında eklenen enerji</span><strong>${fmt(e.above90Energy,1)} kWh</strong></div><div class="mini-item"><span>%0–20 bandında eklenen enerji</span><strong>${fmt(e.lowSocEnergy,1)} kWh</strong></div><div class="mini-item"><span>Soğuk + >1C enerji</span><strong>${fmt(e.coldFast,1)} kWh</strong></div><div class="mini-item"><span>Sıcak + >80% bitiş SOC enerjisi</span><strong>${fmt(e.hotHigh,1)} kWh</strong></div><div class="mini-item"><span>Maks. ortalama / tepe C-rate</span><strong>${e.maxAvg!=null?fmt(e.maxAvg,2)+'C':'—'} / ${e.maxPeak!=null?fmt(e.maxPeak,2)+'C':'—'}</strong></div></div>`;
+  let strongest=r.components.length?[...r.components].sort((a,b)=>b.score-a.score)[0]:null;
+  const notes=[];
+  if(strongest)notes.push(`Son dönemde en baskın izlenen stres faktörü <strong>${escapeHtml(strongest.label)}</strong> (${fmt(strongest.score,0)}/100).`);
+  if(e.highSocShare!=null&&e.highSocShare>20)notes.push(`Kayıtlı şarj enerjisinin %${fmt(e.highSocShare,1)}'i %80 üzerindeki SOC bandında eklenmiş.`);
+  if(e.fast2Share!=null&&e.fast2Share>10)notes.push(`Şarj enerjisinin %${fmt(e.fast2Share,1)}'i 2C üzeri oturumlarda gerçekleşmiş; bu bölge NMC/graphite için daha yüksek dikkat gerektirir.`);
+  if(e.coldFast>0)notes.push(`Soğuk (≤10 °C ortam) ve >1C kombinasyonunda ${fmt(e.coldFast,1)} kWh kayıtlı enerji var; gerçek hücre sıcaklığı bilinmediği için bu bir risk proxy'sidir.`);
+  if(!notes.length)notes.push('Mevcut kayıtlarda belirgin yüksek-stres sinyali görünmüyor; veri kapsamı arttıkça yorum güçlenecek.');
+  byId('stressInterpretation').innerHTML=`<div class="advice-box">${notes.map(x=>`<div>• ${x}</div>`).join('')}</div><p class="muted">Bu yorum kapasite kaybını yüzde olarak tahmin etmez. BSI, maruziyetleri görünür kılmak için tasarlanmıştır.</p>`;
+}
+
 function renderAnalytics(){
   const c=ownerCharges(),t=db.trips,s=db.sohTests,b=balanceStats(),cons=latestConsumptionSnapshot(),cost100=costPer100Metrics();
   const totalCost=sum(c.map(x=>x.cost)),totalEnergy=sum(c.map(chargeEnergyValue)),dcEnergy=sum(c.filter(x=>x.type==='DC').map(chargeEnergyValue));
@@ -528,9 +666,9 @@ function renderProviders(){
 }
 function renderSettings(){
   const s=db.settings;
-  D.vehicleName.value=s.vehicleName;D.batteryChemistry.value=s.batteryChemistry;D.ownershipStartOdo.value=s.ownershipStartOdo??32356;D.ownershipStartSoc.value=s.ownershipStartSoc??59;D.ownershipStartDate.value=s.ownershipStartDate||'';D.trackingStartOdo.value=s.trackingStartOdo??33537;D.currentOdo.value=s.currentOdo??33537;D.currentSoc.value=s.currentSoc??76;D.referenceCapacity.value=s.referenceCapacity;D.preferredMinSoc.value=s.preferredMinSoc;D.preferredMaxSoc.value=s.preferredMaxSoc;D.targetDcShare.value=s.targetDcShare??40;D.balanceWindow.value=s.balanceWindow??10;if(!D.crateCapacity.matches(':focus'))D.crateCapacity.value=s.referenceCapacity;renderProviders();
+  D.vehicleName.value=s.vehicleName;D.batteryChemistry.value=s.batteryChemistry;D.ownershipStartOdo.value=s.ownershipStartOdo??32356;D.ownershipStartSoc.value=s.ownershipStartSoc??59;D.ownershipStartDate.value=s.ownershipStartDate||'';D.trackingStartOdo.value=s.trackingStartOdo??33537;D.currentOdo.value=s.currentOdo??33537;D.currentSoc.value=s.currentSoc??76;D.referenceCapacity.value=s.referenceCapacity;D.preferredMinSoc.value=s.preferredMinSoc;D.preferredMaxSoc.value=s.preferredMaxSoc;D.targetDcShare.value=s.targetDcShare??40;D.balanceWindow.value=s.balanceWindow??10;D.stressWindow.value=s.stressWindow??12;if(!D.crateCapacity.matches(':focus'))D.crateCapacity.value=s.referenceCapacity;renderProviders();
 }
-function renderAll(){renderDashboard();renderCharges();renderConsumptionSnapshots();renderTrips();renderSoh();renderAnalytics();renderSettings();updateSohPreview();updateChargePreview();renderCrate()}
+function renderAll(){renderDashboard();renderCharges();renderConsumptionSnapshots();renderTrips();renderSoh();renderAnalytics();renderStress();renderSettings();updateSohPreview();updateChargePreview();renderCrate()}
 
 D.chargeForm.addEventListener('submit',e=>{
   e.preventDefault();const id=D.chargeId.value||uid();
@@ -572,9 +710,10 @@ document.querySelectorAll('[data-power]').forEach(b=>b.onclick=()=>{D.cratePower
 
 D.settingsForm.addEventListener('submit',e=>{
   e.preventDefault();
-  const next={vehicleName:D.vehicleName.value.trim(),batteryChemistry:D.batteryChemistry.value.trim(),ownershipStartOdo:+D.ownershipStartOdo.value||0,ownershipStartSoc:+D.ownershipStartSoc.value,ownershipStartDate:D.ownershipStartDate.value||'',trackingStartOdo:+D.trackingStartOdo.value||0,currentOdo:+D.currentOdo.value||0,currentSoc:+D.currentSoc.value,referenceCapacity:+D.referenceCapacity.value,preferredMinSoc:+D.preferredMinSoc.value,preferredMaxSoc:+D.preferredMaxSoc.value,targetDcShare:+D.targetDcShare.value,balanceWindow:+D.balanceWindow.value};
+  const next={vehicleName:D.vehicleName.value.trim(),batteryChemistry:D.batteryChemistry.value.trim(),ownershipStartOdo:+D.ownershipStartOdo.value||0,ownershipStartSoc:+D.ownershipStartSoc.value,ownershipStartDate:D.ownershipStartDate.value||'',trackingStartOdo:+D.trackingStartOdo.value||0,currentOdo:+D.currentOdo.value||0,currentSoc:+D.currentSoc.value,referenceCapacity:+D.referenceCapacity.value,preferredMinSoc:+D.preferredMinSoc.value,preferredMaxSoc:+D.preferredMaxSoc.value,targetDcShare:+D.targetDcShare.value,balanceWindow:+D.balanceWindow.value,stressWindow:+D.stressWindow.value};
   if(next.preferredMaxSoc<=next.preferredMinSoc)return alert('Üst SOC sınırı alt sınırdan büyük olmalı.');
   if(!(next.targetDcShare>0&&next.targetDcShare<=100))return alert('DC enerji payı hedefi %1–100 arasında olmalı.');
+  if(!(next.stressWindow>=3&&next.stressWindow<=100))return alert('Stres analizi penceresi 3–100 şarj arasında olmalı.');
   if(!(next.ownershipStartSoc>=0&&next.ownershipStartSoc<=100&&next.currentSoc>=0&&next.currentSoc<=100))return alert('SOC değerleri %0–100 arasında olmalı.');
   db.settings=next;D.crateCapacity.value=next.referenceCapacity;save();alert('Ayarlar kaydedildi.');
 });

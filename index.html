@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="T10X Batarya" />
   <meta name="mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="manifest.webmanifest" />
-  <title>T10X Batarya & Şarj Takip v0.8.7A · Premium / Apple</title>
+  <title>T10X Batarya & Şarj Takip v0.8.8A · Premium / Apple</title>
   <link rel="stylesheet" href="app.css" />
 </head>
 <body>
@@ -52,6 +52,8 @@
     <button class="tab" data-tab="soh">SOH Testleri</button>
     <button class="tab" data-tab="crate">C-rate Simülatörü</button>
     <button class="tab" data-tab="analytics">Analizler</button>
+    <button class="tab" data-tab="stress">Stres Analizi</button>
+    <button class="tab" data-tab="technical-report">Teknik Rapor</button>
     <button class="tab" data-tab="knowledge">Bilgi / Bilimsel Dayanak</button>
     <button class="tab" data-tab="settings">Ayarlar</button>
   </nav>
@@ -72,6 +74,21 @@
         <article class="card">
           <div class="card-head"><h2>Sahiplik Dönemi</h2></div>
           <div id="ownershipSummary"></div>
+        </article>
+      </div>
+      <div class="grid two">
+        <article class="card stress-score-card">
+          <div class="card-head"><h2>Battery Stress Index</h2><span id="stressConfidence" class="badge neutral"></span></div>
+          <div class="health-score-wrap">
+            <div id="stressScoreGauge" class="score-gauge stress-gauge"><span id="stressScoreValue">—</span><small>/100</small></div>
+            <div id="stressScoreSummary" class="health-summary"></div>
+          </div>
+          <div id="stressScoreComponents" class="score-components"></div>
+          <p class="muted">BSI’de düşük değer daha iyidir. Bu, fiziksel ömür tahmini değil; kayıtlı SOC, C-rate, sıcaklık ve hızlı şarj maruziyetinin açıklanabilir indeksidir.</p>
+        </article>
+        <article class="card">
+          <div class="card-head"><h2>Kümülatif Batarya Maruziyeti</h2><button class="link-btn" data-goto="stress">Detay</button></div>
+          <div id="lifetimeExposureSummary"></div>
         </article>
       </div>
       <div class="grid two">
@@ -242,6 +259,128 @@
       </div>
     </section>
 
+    <section id="stress" class="panel">
+      <div class="section-title"><div><h2>Batarya Stres Analizi</h2><p>NMC/graphite için SOC, C-rate, sıcaklık etkileşimi ve şarj throughput maruziyetini ayrı ayrı izler.</p></div></div>
+      <div class="info-box"><strong>Yorumlama:</strong> Battery Stress Index (BSI) 0–100 arasıdır ve <strong>düşük değer daha iyidir</strong>. İndeks, Journal of Power Sources'ta yayımlanan stress-factor yaklaşımından <em>kavramsal olarak</em> esinlenen bir saha göstergesidir; makaledeki fit katsayılarını kopyalamaz ve üretici BMS modeli veya doğrulanmış kalan ömür (RUL) tahmini değildir. İlgili 2026 çalışması kendi test aralığında DOD'u güçlü, C-rate etkisini ise daha sınırlı bulurken; ayrı hızlı-şarj çalışmalarında 4C+ bölgede belirgin rate etkisi görülmektedir. Eksik veri olan bileşenler skordan çıkarılır ve ağırlıklar yeniden normalize edilir.</div>
+      <div class="cards" id="stressCards"></div>
+      <div class="grid two">
+        <article class="card stress-score-card">
+          <div class="card-head"><h2>Son Dönem BSI</h2><span id="stressPanelConfidence" class="badge neutral"></span></div>
+          <div class="health-score-wrap"><div id="stressPanelGauge" class="score-gauge stress-gauge"><span id="stressPanelValue">—</span><small>/100</small></div><div id="stressPanelSummary" class="health-summary"></div></div>
+          <div id="stressPanelComponents" class="score-components"></div>
+        </article>
+        <article class="card"><h2>Veri Kapsamı / Güven</h2><div id="stressCoverage"></div></article>
+      </div>
+      <div class="grid two">
+        <article class="card"><h2>Şarja Eklenen Enerjinin SOC Dağılımı</h2><div id="stressSocBands"></div><p class="muted">Bu grafik zaman maruziyetini değil, şarj sırasında hangi SOC bandında ne kadar enerji eklendiğini gösterir.</p></article>
+        <article class="card"><h2>C-rate Enerji Maruziyeti</h2><div id="stressCRateBands"></div><p class="muted">Enerji + süre varsa ortalama C-rate; yoksa mevcut maksimum güç verisi kullanılır.</p></article>
+      </div>
+      <div class="grid two">
+        <article class="card"><h2>Sıcaklık Maruziyeti</h2><div id="stressTempBands"></div><p class="muted">Girilen değer ortam sıcaklığıdır; hücre/pack çekirdek sıcaklığı yerine yalnızca proxy olarak kullanılır.</p></article>
+        <article class="card"><h2>Throughput / EFC Özeti</h2><div id="stressThroughput"></div></article>
+      </div>
+      <div class="grid two">
+        <article class="card"><h2>Teknik Yorum</h2><div id="stressInterpretation"></div></article>
+        <article class="card"><h2>İndeks Formülü</h2><div class="mini-list"><div class="mini-item vertical"><strong>SOC stresi · %35</strong><span>%80–90 arası orta, %90–100 arası daha yüksek ağırlık. Bilinmeyen SOC skorlanmaz.</span></div><div class="mini-item vertical"><strong>C-rate stresi · %35</strong><span>Ortalama C-rate esas; varsa yüksek tepe C-rate sınırlı ek ceza oluşturur.</span></div><div class="mini-item vertical"><strong>Sıcaklık etkileşimi · %20</strong><span>15–30 °C referans düşük stres bölgesi; soğuk + yüksek C-rate ve sıcak + yüksek SOC kombinasyonları ayrıca ağırlaştırılır.</span></div><div class="mini-item vertical"><strong>DC enerji dengesi · %10</strong><span>Bilimsel zarar eşiği değil; Ayarlar'daki kullanıcı hedefinin aşılması davranışsal proxy olarak kullanılır.</span></div></div><p class="muted">EFC ve toplam throughput kümülatif maruziyet olarak ayrıca raporlanır; yaş ilerledikçe BSI'yi otomatik kötüleştirmemesi için doğrudan BSI bileşeni değildir.</p></article>
+      </div>
+    </section>
+
+    <section id="technical-report" class="panel technical-report">
+      <div class="section-title"><div><h2>NMC / LFP Teknik Raporu</h2><p>Elektronik mühendisliği perspektifiyle elektrokimya, BMS, yaşlanma ve hızlı şarj mekanizmaları.</p></div></div>
+      <div class="report-hero">
+        <div><span class="report-kicker">ENGINEERING NOTE · v1</span><h2>Li-ion EV Bataryalarında NMC ve LFP: Hücre Fiziğinden BMS Kararlarına</h2><p>Bu rapor, uygulamadaki stres analizinin neden bu parametreleri izlediğini açıklamak için hazırlanmıştır. Sayısal eşikler hücre tasarımına özgü değişebileceğinden, kaynaklardaki deney sonuçları “evrensel limit” olarak değil, mekanizma ve ölçek göstergesi olarak kullanılmalıdır.</p></div>
+      </div>
+
+      <details open class="report-section"><summary>1 · Hücre mimarisi ve elektrokimyasal temel</summary><div class="report-body">
+        <p>EV'lerde NMC ve LFP çoğunlukla <strong>grafit veya Si-grafit anot</strong> ile eşleşir. Bu nedenle hızlı şarj limitini yalnızca katot kimyası belirlemez; grafit anot, SEI, elektrolit transportu ve elektrot areal loading'i kritik rol oynar.</p>
+        <div class="equation">NMC: LiMO₂ ⇄ Li₁₋ₓMO₂ + xLi⁺ + xe⁻ &nbsp;&nbsp; | &nbsp;&nbsp; LFP: LiFePO₄ ⇄ FePO₄ + Li⁺ + e⁻</div>
+        <div class="equation">Grafit: C₆ + xLi⁺ + xe⁻ ⇄ LiₓC₆</div>
+        <p>NMC layered-oxide ailesinde Ni kapasite/enerji yoğunluğunu artırırken yüksek delithiation seviyelerinde reaktiviteyi de artırabilir. LFP'nin olivine polianyon yapısındaki güçlü P–O bağı ise oksijen salımını baskılayarak termal kararlılığa katkı verir.</p>
+      </div></details>
+
+      <details class="report-section"><summary>2 · NMC aslında bir aile: 111 → 532 → 622 → 811</summary><div class="report-body">
+        <p><strong>NMC111, 532, 622, 811</strong> gibi adlandırmalar Ni:Mn:Co oranlarını temsil eder. Ni-rich kompozisyonlar daha yüksek özgül kapasite ve enerji yoğunluğu hedefler; buna karşılık yüksek SOC'de yüzey rekonstrüksiyonu, elektrolit oksidasyonu, transition-metal dissolution ve mikroçatlak gibi mekanizmalara duyarlılık artabilir.</p>
+        <p>Bu yüzden iki “NMC” hücre arasında dahi çevrim ömrü farkı; katot oranı, primer/sekonder partikül morfolojisi, kaplama, elektrolit, anot Si oranı ve termal yönetim nedeniyle çok büyük olabilir.</p>
+      </div></details>
+
+      <details class="report-section"><summary>3 · OCV–SOC gözlemlenebilirliği: NMC ile LFP'nin BMS farkı</summary><div class="report-body">
+        <p>NMC'nin OCV–SOC eğrisi geniş bir bölgede anlamlı eğime sahiptir. Bu, dinlenmiş terminal geriliminin SOC düzeltmesine katkı vermesini kolaylaştırır. LFP'de ise iki-fazlı reaksiyon bölgesinde OCV platosu oldukça düzdür ve <code>dOCV/dSOC → 0</code> yaklaşır; aynı zamanda hysteresis önemlidir.</p>
+        <div class="equation">SOC(t)=SOC(t₀) − (1/Qₙ) ∫ I(τ)dτ</div>
+        <p>Sonuç olarak LFP BMS'de coulomb counting, hysteresis modeli, EKF/UKF ve periyodik uç-bölge kalibrasyonu daha kritik hale gelir. 2025–2026 çalışmaları LFP'nin düz OCV platosunun SOC gözlemlenebilirliğini zorlaştırdığını ve bilgi-füzyonlu/adaptif kestirim yöntemlerinin bu nedenle geliştirildiğini gösteriyor.</p>
+      </div></details>
+
+      <details class="report-section"><summary>4 · Yaşlanma dili: LLI, LAM, SEI/CEI ve direnç artışı</summary><div class="report-body">
+        <p><strong>LLI (Loss of Lithium Inventory)</strong> kullanılabilir siklik lityum kaybını, <strong>LAM</strong> ise aktif elektrot malzemesi kaybını ifade eder. Grafitte SEI büyümesi lityumu tüketir ve empedansı artırır; NMC tarafında CEI, partikül çatlaması ve yüzey faz dönüşümleri kapasite/power fade'e katkıda bulunabilir.</p>
+        <p>SOH bu nedenle tek boyutlu değildir. Kapasite SOH yüksek görünürken DCIR artmışsa hücre aynı enerjiyi tutsa bile peak power ve fast-charge kabiliyeti düşebilir.</p>
+        <div class="equation">SOH_Q = Q_actual / Q_reference &nbsp;&nbsp; | &nbsp;&nbsp; SOH_E = E_actual / E_reference</div>
+      </div></details>
+
+      <details class="report-section"><summary>5 · Hızlı şarj: overpotential ve lithium plating</summary><div class="report-body">
+        <p>Terminal gerilimini mühendislik düzeyinde <code>V = OCV + IR + η_ct + η_diff</code> olarak düşünmek yararlıdır. Akım yükseldikçe ohmik, charge-transfer ve difüzyon overpotential'ları büyür. Grafit anot potansiyeli Li/Li⁺ referansına göre sıfıra yaklaşıp altına itilirse interkalasyon yerine metalik lityum çökelmesi başlayabilir.</p>
+        <div class="equation">Li⁺ + e⁻ → Li(metal) &nbsp;&nbsp; [istenmeyen plating]</div>
+        <p>Nature Energy'nin 200'den fazla hücreyi kapsayan 2023 çalışması plating başlangıcının charge rate, sıcaklık, SOC ve enerji yoğunluğuyla güçlü biçimde ilişkili olduğunu deneysel olarak haritaladı. Bu nedenle uygulama C-rate'i tek başına değil SOC ve sıcaklıkla birlikte yorumlar.</p>
+      </div></details>
+
+      <details class="report-section"><summary>6 · Kaynak örneği: NMC/graphite'ta 0,5C–6C testi</summary><div class="report-body">
+        <p>2026 Journal of Power Sources çalışmasında 1,8 Ah NMC622/graphite pouch hücreler 0,5C, 2C, 4C ve 6C şarjla karşılaştırıldı. <strong>2C'de 1.000 çevrimin üzerinde</strong> yaşam görülürken <strong>4C ve 6C'de 500 çevrimin altında</strong> ömür raporlandı. Ana hızlı-şarj bozulma mekanizmaları anotta lithium plating, lityum envanteri kaybı ve LiF-ağırlıklı SEI/empedans artışıydı.</p>
+        <p><strong>Uygulama karşılığı:</strong> 2C “güvenli limit” değildir; ancak 4C+ bölgesinin aynı hücre mimarisinde çok daha agresif olduğu deneysel olarak görülür. T10X'te 180 kW / 88,5 kWh ≈ 2,03C yalnızca paket düzeyinde teorik tepe oranıdır; gerçek seans ortalaması daha düşüktür.</p>
+      </div></details>
+
+      <details class="report-section"><summary>7 · SOC penceresi: neden %20–80 yalnızca bir slogan değil?</summary><div class="report-body">
+        <p>2026 tarihli ticari NMC/graphite çalışması, hızlı şarj protokolü ile SOC penceresini birlikte test etti; düşük-SOC çevrimleri daha yüksek cycle stability verirken yüksek-SOC çalışması empedans bileşenlerini ve degradation'ı hızlandırdı. Bunun altında yüksek katot potansiyeli, elektrolit oksidasyonu/CEI büyümesi ve anot tarafında kinetik marjın daralması gibi mekanizmalar bulunur.</p>
+        <p>Ancak %80 “kimyasal duvar” değildir. Degradation fonksiyonu hücre ve sıcaklığa bağlı sürekli bir eğridir; uygulamada %80 eşiği kullanıcıya anlaşılır ve muhafazakâr bir işletme bandı vermek için kullanılır.</p>
+      </div></details>
+
+      <details class="report-section"><summary>8 · Sıcaklık: Arrhenius etkisi, I²R ve plating etkileşimi</summary><div class="report-body">
+        <div class="equation">D ≈ D₀ exp(−Eₐ/RT) &nbsp;&nbsp; | &nbsp;&nbsp; Q̇_ohmic ≈ I²R</div>
+        <p>Düşük sıcaklıkta difüzyon ve charge-transfer kinetiği yavaşlar; aynı şarj akımı daha büyük anot polarizasyonu oluşturur. Yüksek sıcaklıkta ise yan reaksiyonlar ve SEI/CEI büyümesi hızlanır. Bu yüzden “soğuk + yüksek C-rate” plating için, “sıcak + yüksek SOC” ise calendar aging için kritik kombinasyonlardır.</p>
+        <p>Uygulamadaki sıcaklık alanı çoğunlukla <strong>ortam sıcaklığı</strong> olduğundan gerçek hücre çekirdek sıcaklığının yalnızca proxy'sidir; bu yüzden sıcaklık alt-skora yüksek belirsizlik etiketi konur.</p>
+      </div></details>
+
+      <details class="report-section"><summary>9 · LFP'nin avantajı ve sınırı</summary><div class="report-body">
+        <p>LFP'nin olivine yapısı yüksek termal kararlılık ve genellikle yüksek cycle life sağlar; fakat düşük nominal hücre voltajı ve daha düşük gravimetrik/volumetrik enerji yoğunluğu nedeniyle aynı pack enerjisi için daha fazla hücre/kütle/hacim gerekebilir. Fast-charge açısından katot kararlılığı avantajlı olsa da grafit anot kullanıldığı sürece lithium plating fiziksel sınırı devam eder.</p>
+        <p>2025'te yayımlanan büyük-format LFP çalışmasında 50 °C koşulları 35 °C'ye göre kapasite kaybını yaklaşık iki katına çıkardı ve baskın mekanizma LLI olarak bulundu. Ayrı bir 2025 Journal of Power Sources çalışmasında 50% SOC ve 6 °C'de <strong>10 yıl saklanan</strong> 100 ticari LFP hücrenin taze kapasitesinin en az %96'sını koruduğu raporlandı. Bu iki örnek LFP'nin “yaşlanmaz” olmadığını, şartların çok belirleyici olduğunu gösterir.</p>
+      </div></details>
+
+      <details class="report-section"><summary>10 · NMC–LFP termal güvenlik karşılaştırması</summary><div class="report-body">
+        <p>Automotive cell/module deneylerinde LFP genellikle daha yüksek termal runaway toleransı gösterir. 2024 eTransportation çalışmasında test edilen modül konfigürasyonunda NMC811 termal propagasyonu LFP'ye göre yaklaşık <strong>5 kat daha hızlı</strong> raporlandı. Bu sayı tüm pack tasarımlarına taşınamaz; hücre geometrisi, spacing, thermal barriers ve pack venting tasarımı sonucu ciddi biçimde değiştirir.</p>
+      </div></details>
+
+      <details class="report-section"><summary>11 · EFC, throughput ve neden BSI'den ayrı tutuluyor?</summary><div class="report-body">
+        <p><strong>Equivalent Full Cycle (EFC/FEC)</strong>, kullanım miktarını normalize etmek için yararlıdır. Uygulamada yalnızca şarj enerjisi güvenilir biçimde bilindiği için “charge-side EFC proxy” hesaplanır:</p>
+        <div class="equation">EFC_charge ≈ ΣE_charge / E_reference</div>
+        <p>Bu değer degradation şiddeti değildir; 100 EFC düşük stresli de yüksek stresli de olabilir. Bu nedenle EFC, BSI'yi otomatik yükselten bir bileşen değil, kümülatif maruziyet göstergesidir. 2026 stress-factor çalışması da SOC, DOD, sıcaklık ve C-rate etkilerini ayrıştırmanın, tek bir toplam cycle sayısından daha açıklayıcı olduğunu vurgular.</p>
+      </div></details>
+
+      <details class="report-section"><summary>12 · Uygulamadaki Battery Stress Index nasıl çalışıyor?</summary><div class="report-body">
+        <p>BSI, son ayarlanan şarj penceresindeki dört alt bileşeni enerji-ağırlıklı değerlendirir: <strong>SOC maruziyeti %35, C-rate %35, sıcaklık etkileşimi %20 ve DC enerji dengesi %10</strong>. Bunlar literatürden doğrudan alınmış regresyon katsayıları değil, kullanıcının elindeki sınırlı saha verisi için seçilmiş açıklanabilir heuristic ağırlıklardır. Veri yoksa ilgili bileşen çıkarılır ve kalan ağırlıklar normalize edilir.</p>
+        <ul><li>%20–80 arası şarja eklenen enerji SOC stresine ceza üretmez; %80–90 orta, %90–100 daha yüksek ağırlık alır.</li><li>C-rate skoru doğrusal olmayan artar; 2C üzerindeki maruziyet daha güçlü ağırlık kazanır, 4C+ en yüksek banda girer.</li><li>Soğuk + >1C ve sıcak + >80% SOC kombinasyonları sıcaklık bileşenini ağırlaştırır.</li><li>DC enerji oranı elektrokimyasal “zarar” yerine, kullanıcının tanımladığı denge hedefinden sapma olarak işlenir.</li></ul>
+        <p><strong>Önemli:</strong> BSI, SOH veya RUL değildir. Hücre iç sıcaklığı, gerçek pack current, hücre min/max gerilimleri ve BMS resistance/capacity parametreleri erişilebilir hale gelirse model fiziksel olarak çok daha güçlü hale getirilebilir.</p>
+      </div></details>
+
+      <details class="report-section"><summary>13 · Gerçek araç örneği: INL Nissan Leaf DCFC çalışması</summary><div class="report-body">
+        <p>Idaho National Laboratory'nin 2012 Nissan Leaf çalışmasında dört araç aynı sürüş çevriminde çalıştırıldı; iki araç yalnız AC Level 2, iki araç yalnız 50 kW DCFC ile günde iki kez şarj edildi. 50.000 mil sonunda resmi tabloda AC grubunun ortalama kapasite kaybı yaklaşık <strong>%24,8</strong>, DCFC grubunun yaklaşık <strong>%27,4</strong> olarak hesaplanıyor. Daha sonraki pack-lab analizinde AC pack için %23,1, DCFC pack için %28,1 kapasite kaybı raporlandı.</p>
+        <p>Bu çalışma “DC sadece birkaç yüzde puan fark yaratır” diye genellenmemeli: araçların aktif sıvı termal yönetimi yoktu ve yüksek sıcaklık etkisi belirgindi. INL'nin devam çalışmaları yüksek sıcaklıkta hızlı şarj etkisinin arttığını özellikle vurguladı.</p>
+      </div></details>
+
+      <details class="report-section"><summary>14 · Literatürden kaynak ve deney örnekleri</summary><div class="report-body">
+        <div class="source-list">
+          <a class="source-card" href="https://doi.org/10.1016/j.jpowsour.2026.240065" target="_blank" rel="noopener"><strong>Luo et al. · J. Power Sources 680 (2026) 240065</strong><span>NMC622/graphite · 0,5C/2C/4C/6C · lithium plating ve SEI.</span></a>
+          <a class="source-card" href="https://doi.org/10.1016/j.jpowsour.2026.239975" target="_blank" rel="noopener"><strong>Impact of fast-charging protocols and SOC windows · JPS 678 (2026)</strong><span>NMC/graphite · düşük/yüksek SOC penceresi ve MSCC–CV etkisi.</span></a>
+          <a class="source-card" href="https://doi.org/10.1016/j.jpowsour.2025.238815" target="_blank" rel="noopener"><strong>Quantifying battery stress factors · JPS 663 (2026) 238815</strong><span>SOC, DOD, sıcaklık ve C-rate'i ayrıştıran yorumlanabilir stress-factor modeli.</span></a>
+          <a class="source-card" href="https://doi.org/10.1016/j.jpowsour.2025.237552" target="_blank" rel="noopener"><strong>Morin, Whitacre & Michalek · JPS 652 (2025) 237552</strong><span>NMC/NCA/LFP'de hızlı-yavaş şarj karışımlarının deneysel karşılaştırması.</span></a>
+          <a class="source-card" href="https://doi.org/10.1038/s41560-023-01194-y" target="_blank" rel="noopener"><strong>Konz et al. · Nature Energy 8 (2023)</strong><span>200+ hücrede lithium plating'in rate, SOC, sıcaklık ve enerji yoğunluğuna bağımlılığı.</span></a>
+          <a class="source-card" href="https://www.nrel.gov/docs/fy22osti/82359.pdf" target="_blank" rel="noopener"><strong>NREL · Advances in Lithium Plating, Charge Protocols, and Cathode Aging for XFC</strong><span>Büyük EV hücrelerinde electrochemical-thermal modelleme ve extreme fast charging.</span></a>
+          <a class="source-card" href="https://www.energy.gov/sites/prod/files/2015/01/f19/dcfc_study_fs_50k.pdf" target="_blank" rel="noopener"><strong>INL · DC Fast Charge Effects – 50,000 Mile Update</strong><span>Gerçek araç AC-L2 ve 50 kW DCFC karşılaştırması.</span></a>
+          <a class="source-card" href="https://doi.org/10.1016/j.tsep.2024.102436" target="_blank" rel="noopener"><strong>Saeed et al. · Thermal Science and Engineering Progress (2024)</strong><span>Gerçekçi calendar aging; sıcaklık baskın, 50% SOC en düşük kayıp koşulu.</span></a>
+          <a class="source-card" href="https://doi.org/10.1016/j.est.2025.116774" target="_blank" rel="noopener"><strong>Large-format LFP aging · Journal of Energy Storage 124 (2025)</strong><span>35 °C / 50 °C ve SOC etkisi; yüksek sıcaklık baskın yaşlanma sürücüsü.</span></a>
+          <a class="source-card" href="https://doi.org/10.1016/j.jpowsour.2025.237779" target="_blank" rel="noopener"><strong>10-year LFP shelf-life · JPS 654 (2025) 237779</strong><span>50% SOC, 6 °C'de 10 yıl depolama sonrası ≥96% kapasite.</span></a>
+          <a class="source-card" href="https://doi.org/10.1016/j.etran.2023.100305" target="_blank" rel="noopener"><strong>NMC811 vs LFP thermal propagation · eTransportation 19 (2024)</strong><span>Belirli automotive module testinde NMC propagation ~5× daha hızlı.</span></a>
+          <a class="source-card" href="https://doi.org/10.1016/j.egyai.2026.100693" target="_blank" rel="noopener"><strong>LFP SOC observability · Energy and AI 24 (2026)</strong><span>Düz OCV–SOC bölgesinde information-aware estimator ve hysteresis modeli.</span></a>
+        </div>
+      </div></details>
+    </section>
+
     <section id="knowledge" class="panel">
       <div class="section-title"><div><h2>Bilgi / Bilimsel Dayanak</h2><p>Uygulamadaki karar kurallarının hangi bulgulara dayandığını burada görebilirsiniz.</p></div></div>
       <div class="grid two">
@@ -298,6 +437,7 @@
         <label>Tercih Edilen Üst SOC (%)<input id="preferredMaxSoc" type="number" min="0" max="100" step="1"></label>
         <label>Hedef Maksimum DC Enerji Payı (%)<input id="targetDcShare" type="number" min="5" max="100" step="1"></label>
         <label>Denge Analizi Penceresi (son kaç şarj?)<input id="balanceWindow" type="number" min="3" max="50" step="1"></label>
+        <label>Stres Analizi Penceresi (son kaç şarj?)<input id="stressWindow" type="number" min="3" max="100" step="1"></label>
         <p class="muted">Sahiplik başlangıç km'si, önceki sahibin kullanımını sizin davranış skorunuzdan ayırmak içindir. Varsayılan %40 DC hedefi bilimsel bir “zarar eşiği” değil; DC'yi yasaklamadan AC/DC kullanım dengesini takip etmek için ayarlanabilir bir kullanım hedefidir. 88,5 kWh nominal referanstır; doğrulanmış kullanılabilir kapasite elde edilirse SOH için referans kapasiteyi güncelleyin.</p>
         <div class="form-actions"><button type="submit">Ayarları Kaydet</button><button type="button" id="clearAllBtn" class="danger">Tüm Verileri Sil</button></div>
       </form>
@@ -322,7 +462,7 @@
     </section>
   </main>
 
-  <footer>v0.8.7A · Premium / Apple · Tek kullanıcı giriş kapısı · Firebase Sync · GitHub Pages · iPhone uyumlu · km/SOC eksik geçmiş kayıt desteği · süre→ortalama güç/C-rate</footer>
+  <footer>v0.8.8A · Premium / Apple · Engineer Edition · Tek kullanıcı giriş kapısı · Firebase Sync · GitHub Pages · iPhone uyumlu · km/SOC eksik geçmiş kayıt desteği · süre→ortalama güç/C-rate</footer>
   </div>
 
   <script src="app.js"></script>
