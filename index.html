@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="T10X Batarya" />
   <meta name="mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="manifest.webmanifest" />
-  <title>T10X Batarya & Şarj Takip v0.9.0 · Premium / Apple · Charge Planner</title>
+  <title>T10X Batarya & Şarj Takip v0.9.1 · Premium / Apple · Charge Planner</title>
   <link rel="stylesheet" href="app.css" />
 </head>
 <body>
@@ -55,6 +55,7 @@
     <button class="tab" data-tab="analytics">Analizler</button>
     <button class="tab" data-tab="stress">Stres Analizi</button>
     <button class="tab" data-tab="technical-report">Teknik Rapor</button>
+    <button class="tab" data-tab="glossary">Terimler & Kısaltmalar</button>
     <button class="tab" data-tab="knowledge">Bilgi / Bilimsel Dayanak</button>
     <button class="tab" data-tab="settings">Ayarlar</button>
   </nav>
@@ -79,7 +80,7 @@
       </div>
       <div class="grid two">
         <article class="card stress-score-card">
-          <div class="card-head"><h2>Battery Stress Index</h2><span id="stressConfidence" class="badge neutral"></span></div>
+          <div class="card-head"><h2>Batarya Stres İndeksi (BSI)</h2><span id="stressConfidence" class="badge neutral"></span></div>
           <div class="health-score-wrap">
             <div id="stressScoreGauge" class="score-gauge stress-gauge"><span id="stressScoreValue">—</span><small>/100</small></div>
             <div id="stressScoreSummary" class="health-summary"></div>
@@ -312,11 +313,11 @@
 
     <section id="stress" class="panel">
       <div class="section-title"><div><h2>Batarya Stres Analizi</h2><p>NMC/graphite için cycle/charge stresi ile calendar stresini ayırır; SOC×zaman, C-rate, şarj derinliği ve termal bağlamı birlikte izler.</p></div></div>
-      <div class="info-box"><strong>Yorumlama:</strong> Battery Stress Index (BSI) 0–100 arasıdır ve <strong>düşük değer daha iyidir</strong>. v0.9 ile AC/DC etiketi BSI'dan çıkarılmıştır. İndeks iki fiziksel sınıfı ayrı tutar: <strong>Cycle/Charge Stress Index (CSI)</strong> C-rate, şarj derinliği ve yüksek-SOC şarj penceresine; <strong>Calendar Stress Index (CalSI)</strong> ise SOC×zaman ve termal bağlama dayanır. Bunlar açıklanabilir heuristic göstergelerdir; üretici BMS modeli veya RUL tahmini değildir.</div>
+      <div class="info-box"><strong>Yorumlama:</strong> Batarya Stres İndeksi (BSI) 0–100 arasıdır ve <strong>düşük değer daha iyidir</strong>. v0.9 ile AC/DC etiketi BSI'dan çıkarılmıştır. İndeks iki fiziksel sınıfı ayrı tutar: <strong>Çevrim/Şarj Stres İndeksi (CSI)</strong> C-rate, şarj derinliği ve yüksek-SOC şarj penceresine; <strong>Takvim Stres İndeksi (CalSI)</strong> ise SOC×zaman ve termal bağlama dayanır. Bunlar açıklanabilir sezgisel (heuristic) göstergelerdir; üretici BMS modeli veya RUL tahmini değildir.</div>
       <div class="cards" id="stressCards"></div>
       <div class="grid two">
         <article class="card"><div class="card-head"><h2>Cycle / Charge Stress Index</h2><span id="cycleStressBadge" class="badge neutral"></span></div><div id="cycleStressDetail"></div></article>
-        <article class="card"><div class="card-head"><h2>Calendar Stress Index</h2><span id="calendarStressBadge" class="badge neutral"></span></div><div id="calendarStressDetail"></div></article>
+        <article class="card"><div class="card-head"><h2>Takvim Stresi Index</h2><span id="calendarStressBadge" class="badge neutral"></span></div><div id="calendarStressDetail"></div></article>
       </div>
       <div class="grid two">
         <article class="card stress-score-card">
@@ -332,7 +333,7 @@
       </div>
       <div class="grid two">
         <article class="card"><h2>Ortam Sıcaklığı Maruziyeti</h2><div id="stressTempBands"></div><p class="muted">Ortam sıcaklığı yalnızca termal proxy’dir. Gerçek batarya sıcaklığı girilmişse algoritma onu önceliklendirir; değilse park ortamı, park süresi ve şarj öncesi sürüş ile nitel termal durum oluşturulur.</p></article>
-        <article class="card"><h2>Throughput / EFC Özeti</h2><div id="stressThroughput"></div></article>
+        <article class="card"><h2>Enerji Geçişi (Throughput) / EFC Özeti</h2><div id="stressThroughput"></div></article>
       </div>
       <div class="grid two">
         <article class="card"><h2>SOC × Zaman Özeti</h2><div id="socTimeStress"></div></article>
@@ -340,7 +341,7 @@
       </div>
       <div class="grid two">
         <article class="card"><h2>Teknik Yorum</h2><div id="stressInterpretation"></div></article>
-        <article class="card"><h2>İndeks Formülü</h2><div class="mini-list"><div class="mini-item vertical"><strong>CSI · C-rate</strong><span>Ortalama C-rate esas alınır; düşük güçlü DC ile yüksek güçlü DC aynı sınıfa konmaz.</span></div><div class="mini-item vertical"><strong>CSI · Şarj derinliği / ΔSOC</strong><span>Sığ şarj çevrimleri, aynı yüksek-SOC bölgede kalmadıkları sürece daha düşük cycle-stress proxy üretir.</span></div><div class="mini-item vertical"><strong>CSI · SOC penceresi</strong><span>%80–90 orta, %90–100 daha yüksek ağırlık; %20 altı yalnızca küçük ağırlık alır.</span></div><div class="mini-item vertical"><strong>CalSI · SOC×zaman</strong><span>Ortalama SOC, >%80 saat ve >%90 saat piecewise-linear zaman integraliyle tahmin edilir.</span></div><div class="mini-item vertical"><strong>CalSI · Termal bağlam</strong><span>Gerçek batarya sıcaklığı varsa doğrudan; yoksa ortam + park + ön sürüş nitel proxy olarak kullanılır.</span></div></div><p class="muted">AC/DC oranı artık BSI bileşeni değildir. EFC ve toplam throughput kümülatif maruziyet olarak ayrıca raporlanır.</p></article>
+        <article class="card"><h2>İndeks Formülü</h2><div class="mini-list"><div class="mini-item vertical"><strong>CSI · C-rate</strong><span>Ortalama C-rate esas alınır; düşük güçlü DC ile yüksek güçlü DC aynı sınıfa konmaz.</span></div><div class="mini-item vertical"><strong>CSI · Şarj derinliği / ΔSOC</strong><span>Sığ şarj çevrimleri, aynı yüksek-SOC bölgede kalmadıkları sürece daha düşük çevrim stresi göstergesi (cycle-stress proxy) üretir.</span></div><div class="mini-item vertical"><strong>CSI · SOC penceresi</strong><span>%80–90 orta, %90–100 daha yüksek ağırlık; %20 altı yalnızca küçük ağırlık alır.</span></div><div class="mini-item vertical"><strong>CalSI · SOC×zaman</strong><span>Ortalama SOC, >%80 saat ve >%90 saat piecewise-linear zaman integraliyle tahmin edilir.</span></div><div class="mini-item vertical"><strong>CalSI · Termal bağlam</strong><span>Gerçek batarya sıcaklığı varsa doğrudan; yoksa ortam + park + ön sürüş nitel termal gösterge (proxy) olarak kullanılır.</span></div></div><p class="muted">AC/DC oranı artık BSI bileşeni değildir. EFC ve toplam enerji geçişi (throughput) kümülatif maruziyet olarak ayrıca raporlanır.</p></article>
       </div>
     </section>
 
@@ -405,14 +406,14 @@
         <p>Automotive cell/module deneylerinde LFP genellikle daha yüksek termal runaway toleransı gösterir. 2024 eTransportation çalışmasında test edilen modül konfigürasyonunda NMC811 termal propagasyonu LFP'ye göre yaklaşık <strong>5 kat daha hızlı</strong> raporlandı. Bu sayı tüm pack tasarımlarına taşınamaz; hücre geometrisi, spacing, thermal barriers ve pack venting tasarımı sonucu ciddi biçimde değiştirir.</p>
       </div></details>
 
-      <details class="report-section"><summary>11 · EFC, throughput ve neden BSI'den ayrı tutuluyor?</summary><div class="report-body">
+      <details class="report-section"><summary>11 · EFC, enerji geçişi (throughput) ve neden BSI'den ayrı tutuluyor?</summary><div class="report-body">
         <p><strong>Equivalent Full Cycle (EFC/FEC)</strong>, kullanım miktarını normalize etmek için yararlıdır. Uygulamada yalnızca şarj enerjisi güvenilir biçimde bilindiği için “charge-side EFC proxy” hesaplanır:</p>
         <div class="equation">EFC_charge ≈ ΣE_charge / E_reference</div>
         <p>Bu değer degradation şiddeti değildir; 100 EFC düşük stresli de yüksek stresli de olabilir. Bu nedenle EFC, BSI'yi otomatik yükselten bir bileşen değil, kümülatif maruziyet göstergesidir. 2026 stress-factor çalışması da SOC, DOD, sıcaklık ve C-rate etkilerini ayrıştırmanın, tek bir toplam cycle sayısından daha açıklayıcı olduğunu vurgular.</p>
       </div></details>
 
-      <details class="report-section"><summary>12 · Uygulamadaki CSI, CalSI ve Battery Stress Index nasıl çalışıyor?</summary><div class="report-body">
-        <p>v0.9 ile stres modeli iki fiziksel eksene ayrılmıştır. <strong>Cycle / Charge Stress Index (CSI)</strong>; enerji-ağırlıklı C-rate maruziyeti, şarj derinliği (ΔSOC) ve SOC penceresinin konumunu değerlendirir. <strong>Calendar Stress Index (CalSI)</strong> ise mümkün olduğunda SOC×zaman maruziyetini ve termal bağlamı kullanır. Genel <strong>BSI = %65 CSI + %35 CalSI</strong> olarak sunulur. Bunlar literatürden doğrudan alınmış ömür-regresyon katsayıları değil, bileşenleri açık bir saha takip indeksidir.</p>
+      <details class="report-section"><summary>12 · Uygulamadaki CSI, CalSI ve Batarya Stres İndeksi (BSI) nasıl çalışıyor?</summary><div class="report-body">
+        <p>v0.9 ile stres modeli iki fiziksel eksene ayrılmıştır. <strong>Cycle / Charge Stress Index (CSI)</strong>; enerji-ağırlıklı C-rate maruziyeti, şarj derinliği (ΔSOC) ve SOC penceresinin konumunu değerlendirir. <strong>Takvim Stres İndeksi (CalSI)</strong> ise mümkün olduğunda SOC×zaman maruziyetini ve termal bağlamı kullanır. Genel <strong>BSI = %65 CSI + %35 CalSI</strong> olarak sunulur. Bunlar literatürden doğrudan alınmış ömür-regresyon katsayıları değil, bileşenleri açık bir saha takip indeksidir.</p>
         <ul><li>AC/DC etiketi BSI bileşeni değildir. 50 kW DC ile 180 kW DC, ölçülen/hesaplanan C-rate'e göre farklı değerlendirilir.</li><li>%20–80 bir koruma bandıdır; %20'ye düşmeyi beklemek veya her şarjı %80'e tamamlamak zorunlu değildir. Sığ çevrimler düşük ΔSOC stresi alır.</li><li>%80–90 ve özellikle %90–100 bölgeleri, aynı ΔSOC için daha yüksek SOC-pencere ağırlığı alır.</li><li>C-rate skoru doğrusal olmayan artar; 2C üzerindeki maruziyet daha güçlü, 4C+ en yüksek banttadır.</li><li>Soğuk + yüksek C-rate ve sıcak + yüksek SOC kombinasyonları termal/calendar stresini artırır.</li><li>SOC×zaman hesabı yalnızca yeterli zaman damgalı gözlem varsa kullanılır; uzun veri boşlukları otomatik olarak kapsam dışında bırakılır.</li></ul>
         <p><strong>Önemli:</strong> BSI, SOH veya RUL değildir. Hücre iç sıcaklığı, gerçek pack current, hücre min/max gerilimleri ve BMS resistance/capacity parametreleri erişilebilir hale gelirse model fiziksel olarak çok daha güçlü hale getirilebilir.</p>
       </div></details>
@@ -443,16 +444,106 @@
         <p>v0.9 karar motoru AC ve DC'yi doğrudan “iyi/kötü” sınıfına ayırmaz. Paket düzeyinde yaklaşık <code>C-rate ≈ P(kW)/E(kWh)</code> kullanılır. 88,5 kWh T10X için 50 kW DC ≈ 0,56C, 90 kW ≈ 1,02C ve 180 kW ≈ 2,03C'dir. Bu nedenle düşük güçlü DC, 180 kW tepe hızlı şarjla aynı stres kategorisine konmamalıdır.</p>
         <p>2026 tarihli NMC/graphite çalışması aynı 60 puanlık SOC penceresinde 0–60% çevrimin 20–80% ve özellikle 40–100%'e göre daha yüksek çevrim kararlılığı verdiğini gösterdi. Bu bulgu, “%20’ye düşmeden şarj etme” kuralını desteklemez; daha sığ ve daha düşük ortalama SOC'li çevrimler çoğu durumda avantajlı olabilir.</p>
         <p>Calendar aging için yalnızca “%80 üstüne çıktı mı?” yerine <strong>ne kadar süre yüksek SOC'de kaldı?</strong> sorusu önemlidir. Uygulama bu nedenle zaman damgalı SOC noktalarını birleştirerek ortalama SOC, >80% saat ve >90% saat için bir <em>SOC-time proxy</em> hesaplar. Uzun veri boşlukları entegrasyona katılmaz ve güven göstergesi düşürülür.</p>
-        <p>Termal tarafta ortam sıcaklığı gerçek pack sıcaklığı değildir. Gerçek BMS sıcaklığı girilirse önceliklidir; yoksa dış sıcaklık, park ortamı, güneş/gölge, park süresi ve şarj öncesi sürüş yalnızca nitel termal proxy üretir. Bu özellikle Ankara'nın sıcak yaz öğleden sonraları ve cold-soak kış sabahlarında önemlidir.</p>
+        <p>Termal tarafta ortam sıcaklığı gerçek pack sıcaklığı değildir. Gerçek BMS sıcaklığı girilirse önceliklidir; yoksa dış sıcaklık, park ortamı, güneş/gölge, park süresi ve şarj öncesi sürüş yalnızca nitel termal proxy üretir. Bu özellikle Ankara'nın sıcak yaz öğleden sonraları ve soğukta uzun süre bekleme (cold-soak) kış sabahlarında önemlidir.</p>
         <div class="source-list"><a class="source-card" href="https://doi.org/10.1016/j.jpowsour.2026.239975" target="_blank" rel="noopener"><strong>Zhiani et al. · JPS 678 (2026) 239975</strong><span>0–60 / 20–80 / 40–100 SOC pencereleri; düşük-SOC cycling en yüksek stabilite.</span></a><a class="source-card" href="https://doi.org/10.1038/s41560-023-01194-y" target="_blank" rel="noopener"><strong>Konz et al. · Nature Energy 8 (2023)</strong><span>Lithium plating onset: charge rate, SOC, sıcaklık ve hücre enerji yoğunluğunun birleşik etkisi.</span></a></div>
       </div></details>
 
       <details class="report-section"><summary>16 · Meteoroloji, park koşulu ve şarj zamanlaması</summary><div class="report-body">
-        <p>Batarya hücre sıcaklığı ile meteorolojik hava sıcaklığı aynı değişken değildir. Pack; sürüş yükü, termal yönetim, güneş radyasyonu, asfalt/zemin sıcaklığı ve park süresi nedeniyle ortamdan daha sıcak veya daha soğuk olabilir. Bu nedenle v0.9 otomatik hava sıcaklığını <strong>ambient thermal proxy</strong> olarak etiketler; BMS/servis üzerinden gerçek batarya sıcaklığı girilmişse onu önceliklendirir.</p>
+        <p>Batarya hücre sıcaklığı ile meteorolojik hava sıcaklığı aynı değişken değildir. Pack; sürüş yükü, termal yönetim, güneş radyasyonu, asfalt/zemin sıcaklığı ve park süresi nedeniyle ortamdan daha sıcak veya daha soğuk olabilir. Bu nedenle v0.9 otomatik hava sıcaklığını <strong>ortam sıcaklığına dayalı termal gösterge (ambient thermal proxy)</strong> olarak etiketler; BMS/servis üzerinden gerçek batarya sıcaklığı girilmişse onu önceliklendirir.</p>
         <p>Planlayıcı, hareket saati belli olduğunda saatlik sıcaklık tahminini tarar. Hedef SOC ≤80 ise termal açıdan daha elverişli bir şarj penceresi ile gereksiz yüksek-SOC bekleme süresi arasında denge kurar. Hedef SOC >80 ise calendar-aging açısından şarjın hareket saatine yakın tamamlanmasını önceler. Açık hava/güneş parkı sıcak saatlerde ek risk proxy'si, uzun dış ortam parkı ise ambient verinin pack durumunu temsil etme olasılığını artıran bir güven girdisi olarak kullanılır.</p>
         <p>iPhone konumu yalnızca hava sorgusu sırasında RAM içinde kullanılır; koordinatlar uygulama verisine veya Firebase'e yazılmaz. GitHub Pages tarayıcı ortamında stabil CORS erişimi için otomatik veri katmanı Open-Meteo ile uygulanmıştır. MGM'nin resmi saatlik tahmin sayfası referans olarak uygulamada tutulur; resmi ve dokümante edilmiş makine-okunabilir bir MGM erişimi sağlanırsa <code>WeatherProvider</code> katmanına eklenebilir.</p>
         <div class="source-list"><a class="source-card" href="https://www.mgm.gov.tr/tahmin/saatlik.aspx?m=ANKARA" target="_blank" rel="noopener"><strong>Meteoroloji Genel Müdürlüğü · Ankara saatlik tahmin</strong><span>Resmi Türkiye meteoroloji referansı; uygulamada kullanıcı tarafından açılabilir.</span></a><a class="source-card" href="https://open-meteo.com/en/docs" target="_blank" rel="noopener"><strong>Open-Meteo Forecast API</strong><span>Tarayıcıdan otomatik mevcut/saatlik sıcaklık verisi için kullanılan makine-okunabilir katman.</span></a></div>
       </div></details>
+    </section>
+
+    <section id="glossary" class="panel glossary-panel">
+      <div class="section-title">
+        <div>
+          <h2>Terimler & Kısaltmalar</h2>
+          <p>Uygulamada geçen teknik kavramların Türkçe karşılıkları, kısa tanımları ve T10X açısından pratik anlamları.</p>
+        </div>
+      </div>
+      <div class="glossary-search-wrap">
+        <input id="glossarySearch" type="search" placeholder="Terim ara: throughput, SOC, C-rate, plating..." autocomplete="off">
+        <span id="glossaryCount" class="muted"></span>
+      </div>
+      <div class="info-box"><strong>Okuma biçimi:</strong> Türkçe karşılık ilk sıradadır; yaygın İngilizce teknik ifade ve kısaltma parantez içinde korunur. Böylece hem uygulamadaki sonucu kolay okuyabilir hem de akademik kaynaklarda aynı terimi bulabilirsiniz.</div>
+
+      <div class="glossary-groups">
+        <section class="glossary-group">
+          <h3>Temel batarya ve şarj kavramları</h3>
+          <div class="glossary-grid">
+            <article class="glossary-item" data-terms="soc state of charge şarj durumu doluluk"><div class="glossary-term">SOC · Şarj Durumu</div><div class="glossary-en">State of Charge</div><p>Bataryanın o anda kullanılabilir kapasitesinin ne kadar dolu olduğunu yüzde olarak ifade eder. Yakıt göstergesine benzetilebilir; bataryanın sağlık durumunu göstermez.</p><div class="glossary-example">Örnek: %76 SOC = batarya o anda yaklaşık %76 dolu.</div></article>
+            <article class="glossary-item" data-terms="soh state of health sağlık kapasite"><div class="glossary-term">SOH · Batarya Sağlık Durumu</div><div class="glossary-en">State of Health</div><p>Bataryanın yeni durumuna göre kapasite ve/veya güç kabiliyetini ne ölçüde koruduğunu ifade eder. Uygulamadaki saha SOH değeri kapasite odaklı bir tahmindir; BMS/servis ölçümünün yerine geçmez.</p></article>
+            <article class="glossary-item" data-terms="nmc nickel manganese cobalt nikel mangan kobalt"><div class="glossary-term">NMC · Nikel-Mangan-Kobalt</div><div class="glossary-en">Nickel Manganese Cobalt</div><p>T10X'inizde bulunan lityum-iyon katot kimyası ailesidir. Yüksek enerji yoğunluğu sunar; yüksek SOC, yüksek sıcaklık ve yüksek şarj akımlarına maruziyet yaşlanmayı hızlandırabilir.</p></article>
+            <article class="glossary-item" data-terms="lfp lifepo4 lithium iron phosphate lityum demir fosfat"><div class="glossary-term">LFP · Lityum Demir Fosfat</div><div class="glossary-en">Lithium Iron Phosphate · LiFePO₄</div><p>Olivin yapılı katot kimyasıdır. Genellikle NMC'ye göre daha yüksek termal kararlılık ve çevrim ömrü, fakat daha düşük enerji yoğunluğu sunar.</p></article>
+            <article class="glossary-item" data-terms="ac alternating current alternatif akım şarj"><div class="glossary-term">AC Şarj · Alternatif Akım</div><div class="glossary-en">Alternating Current Charging</div><p>Şebekeden gelen AC enerjinin aracın onboard charger'ı tarafından DC'ye çevrilerek bataryaya verilmesidir. T10X'te düşük C-rate nedeniyle günlük kullanımda genellikle düşük stresli şarj yöntemidir.</p></article>
+            <article class="glossary-item" data-terms="dc direct current doğru akım hızlı şarj"><div class="glossary-term">DC Şarj · Doğru Akım</div><div class="glossary-en">Direct Current Charging</div><p>Harici şarj cihazının AC/DC dönüşümünü yaparak bataryaya doğrudan DC sağlamasıdır. Batarya stresi açısından yalnızca “DC” etiketi değil, gerçek güç/C-rate, SOC ve sıcaklık önemlidir.</p></article>
+            <article class="glossary-item" data-terms="c-rate crate c rate şarj oranı"><div class="glossary-term">C-rate · Şarj/Deşarj Oranı</div><div class="glossary-en">C-rate</div><p>Akımın batarya kapasitesine göre normalize edilmiş hızıdır. Paket düzeyinde uygulamada yaklaşık olarak güç (kW) / kapasite (kWh) kullanılır.</p><div class="glossary-example">T10X: 180 kW / 88,5 kWh ≈ 2,03C.</div></article>
+            <article class="glossary-item" data-terms="average c-rate ortalama c rate"><div class="glossary-term">Ortalama C-rate</div><div class="glossary-en">Average C-rate</div><p>Bir şarj seansında alınan toplam enerji ve geçen süreden hesaplanan ortalama şarj yüküdür. Seans boyunca gerçek maruziyeti tek bir kısa güç pikinden daha iyi temsil eder.</p></article>
+            <article class="glossary-item" data-terms="peak c-rate tepe c rate maximum maksimum güç"><div class="glossary-term">Tepe C-rate</div><div class="glossary-en">Peak C-rate</div><p>Şarj sırasında görülen en yüksek güçten hesaplanan yaklaşık C-rate'tir. Kısa süreli maksimum yükü gösterir; tüm seansın bu hızda gerçekleştiği anlamına gelmez.</p></article>
+            <article class="glossary-item" data-terms="delta soc Δsoc soc farkı"><div class="glossary-term">ΔSOC · SOC Değişimi</div><div class="glossary-en">Delta State of Charge</div><p>Başlangıç ve bitiş SOC arasındaki yüzde-puan farkıdır. Şarj derinliği ve sığ/derin çevrim değerlendirmelerinde kullanılır.</p><div class="glossary-example">%35 → %70 şarj = 35 yüzde-puan ΔSOC.</div></article>
+          </div>
+        </section>
+
+        <section class="glossary-group">
+          <h3>Enerji, çevrim ve yaşlanma</h3>
+          <div class="glossary-grid">
+            <article class="glossary-item" data-terms="throughput enerji geçişi enerji throughput"><div class="glossary-term">Enerji Geçişi · Throughput</div><div class="glossary-en">Energy Throughput</div><p>Belirli dönemde bataryaya giren veya bataryadan çıkan toplam enerji miktarıdır. “DC enerji geçişi” yalnız DC şarjlardan bataryaya aktarılan toplam kWh'yi ifade eder.</p><div class="glossary-example">10 DC seansta toplam 280 kWh alındıysa DC enerji geçişi = 280 kWh.</div></article>
+            <article class="glossary-item" data-terms="efc equivalent full cycle eşdeğer tam çevrim"><div class="glossary-term">EFC · Eşdeğer Tam Çevrim</div><div class="glossary-en">Equivalent Full Cycle</div><p>Kısmi çevrimleri tek bir ortak ölçekte toplar. Örneğin iki adet %50'lik enerji çevrimi yaklaşık bir eşdeğer tam çevrime karşılık gelir. Uygulamada şarj tarafı verilerinden yaklaşık EFC izlenir.</p></article>
+            <article class="glossary-item" data-terms="dod depth of discharge deşarj derinliği"><div class="glossary-term">DoD · Deşarj Derinliği</div><div class="glossary-en">Depth of Discharge</div><p>Bir çevrimde batarya kapasitesinin ne kadarının kullanıldığını ifade eder. SOC ile ters ilişkilidir; örneğin %80'den %30'a kullanım yaklaşık %50 DoD'dur.</p></article>
+            <article class="glossary-item" data-terms="cycle aging çevrim yaşlanması"><div class="glossary-term">Çevrim Yaşlanması</div><div class="glossary-en">Cycle Aging</div><p>Şarj/deşarj çevrimleri nedeniyle oluşan kapasite ve güç kaybıdır. C-rate, DoD, SOC penceresi, sıcaklık ve toplam enerji geçişi etkiler.</p></article>
+            <article class="glossary-item" data-terms="calendar aging takvim yaşlanması"><div class="glossary-term">Takvim Yaşlanması</div><div class="glossary-en">Calendar Aging</div><p>Araç kullanılmasa bile zamanla meydana gelen yaşlanmadır. Özellikle yüksek SOC'de ve yüksek sıcaklıkta bekleme NMC hücrelerde önemli bir etkendir.</p></article>
+            <article class="glossary-item" data-terms="soc time soc×zaman exposure maruziyet"><div class="glossary-term">SOC × Zaman Maruziyeti</div><div class="glossary-en">SOC-Time Exposure</div><p>Bataryanın yalnızca hangi SOC'ye çıktığını değil, o SOC seviyelerinde ne kadar süre kaldığını ifade eder. Uygulama özellikle %80 ve %90 üzerindeki saatleri izler.</p></article>
+            <article class="glossary-item" data-terms="lli loss of lithium inventory aktif lityum kaybı"><div class="glossary-term">LLI · Aktif Lityum Envanteri Kaybı</div><div class="glossary-en">Loss of Lithium Inventory</div><p>Çevrimde kullanılabilir lityum iyonlarının SEI büyümesi, plating gibi yan reaksiyonlarla geri dönüşsüz kaybedilmesidir. Kapasite azalmasının önemli mekanizmalarındandır.</p></article>
+            <article class="glossary-item" data-terms="lam loss of active material aktif malzeme kaybı"><div class="glossary-term">LAM · Aktif Malzeme Kaybı</div><div class="glossary-en">Loss of Active Material</div><p>Katot veya anot malzemesinin bir bölümünün elektrokimyasal olarak kullanılamaz hale gelmesidir. Çatlaklar, yapısal bozulma ve elektriksel temas kaybı buna yol açabilir.</p></article>
+          </div>
+        </section>
+
+        <section class="glossary-group">
+          <h3>Elektrokimya ve BMS</h3>
+          <div class="glossary-grid">
+            <article class="glossary-item" data-terms="bms battery management system batarya yönetim sistemi"><div class="glossary-term">BMS · Batarya Yönetim Sistemi</div><div class="glossary-en">Battery Management System</div><p>Hücre gerilimleri, akım, sıcaklık, SOC ve koruma limitlerini izleyen/kontrol eden elektronik sistemdir. Şarj gücünü güvenli sınırlar içinde tutmakta kritik rol oynar.</p></article>
+            <article class="glossary-item" data-terms="ocv open circuit voltage açık devre gerilimi"><div class="glossary-term">OCV · Açık Devre Gerilimi</div><div class="glossary-en">Open-Circuit Voltage</div><p>Hücreden anlamlı akım akmadığı, dinlenmiş durumdaki gerilimdir. SOC kestiriminde kullanılabilir; LFP'nin düz OCV-SOC platosu bu yöntemi zorlaştırır.</p></article>
+            <article class="glossary-item" data-terms="dcir internal resistance iç direnç direct current internal resistance"><div class="glossary-term">DCIR · DC İç Direnç</div><div class="glossary-en">Direct-Current Internal Resistance</div><p>Bataryanın akım değişimine karşı gösterdiği etkin iç direnç göstergesidir. Yaşlanmayla artması güç kaybı ve daha fazla I²R ısınması anlamına gelebilir.</p></article>
+            <article class="glossary-item" data-terms="sei solid electrolyte interphase katı elektrolit arayüzü"><div class="glossary-term">SEI · Katı Elektrolit Ara Fazı</div><div class="glossary-en">Solid Electrolyte Interphase</div><p>Grafit anot yüzeyinde oluşan pasifleştirici tabakadır. Gereklidir; ancak zamanla kalınlaşması aktif lityum tüketebilir ve empedansı artırabilir.</p></article>
+            <article class="glossary-item" data-terms="cei cathode electrolyte interphase katot elektrolit"><div class="glossary-term">CEI · Katot-Elektrolit Ara Fazı</div><div class="glossary-en">Cathode Electrolyte Interphase</div><p>Katot yüzeyindeki reaksiyon ürünleri tabakasıdır. Özellikle yüksek voltaj/yüksek SOC koşullarında büyümesi empedans ve yaşlanmayla ilişkilidir.</p></article>
+            <article class="glossary-item" data-terms="lithium plating lityum kaplanması metalik lityum"><div class="glossary-term">Lityum Kaplanması · Lithium Plating</div><div class="glossary-en">Metallic Lithium Deposition</div><p>Şarj sırasında lityumun grafite yeterince hızlı interkale olamayıp anot yüzeyinde metalik lityum olarak birikmesidir. Yüksek akım, düşük sıcaklık ve yüksek SOC riski artırır.</p></article>
+            <article class="glossary-item" data-terms="overpotential aşırı potansiyel polarization polarizasyon"><div class="glossary-term">Aşırı Potansiyel · Overpotential</div><div class="glossary-en">Electrochemical Overpotential</div><p>Akım altında gerçek elektrot potansiyelinin denge değerinden sapmasıdır. Ohmik, yük aktarım ve difüzyon bileşenleri vardır; yüksek akım ve düşük sıcaklıkta artar.</p></article>
+            <article class="glossary-item" data-terms="coulomb counting kulomb sayımı soc estimator"><div class="glossary-term">Kulomb Sayımı · Coulomb Counting</div><div class="glossary-en">Coulomb Counting</div><p>Akımı zamana göre entegre ederek SOC değişimini hesaplama yöntemidir. Akım sensörü ve kapasite hataları zamanla birikebildiğinden BMS genellikle başka gözlem yöntemleriyle düzeltme yapar.</p></article>
+            <article class="glossary-item" data-terms="hysteresis histerezis ocv"><div class="glossary-term">Histerezis</div><div class="glossary-en">Voltage Hysteresis</div><p>Aynı SOC'de şarj ve deşarj yönüne göre farklı denge gerilimlerinin görülmesidir. Özellikle LFP'de SOC kestirimini karmaşıklaştırır.</p></article>
+            <article class="glossary-item" data-terms="cell balancing hücre dengeleme top balancing"><div class="glossary-term">Hücre Dengeleme · Cell Balancing</div><div class="glossary-en">Cell Balancing</div><p>Seri bağlı hücrelerin SOC/gerilim farklılıklarının BMS tarafından azaltılmasıdır. Hücrelerden birinin erken üst/alt limite ulaşmasını önlemeye yardımcı olur.</p></article>
+          </div>
+        </section>
+
+        <section class="glossary-group">
+          <h3>Termal ve hızlı şarj kavramları</h3>
+          <div class="glossary-grid">
+            <article class="glossary-item" data-terms="ambient temperature ortam sıcaklığı"><div class="glossary-term">Ortam Sıcaklığı</div><div class="glossary-en">Ambient Temperature</div><p>Aracın çevresindeki hava sıcaklığıdır. Batarya hücre sıcaklığıyla aynı değildir; uygulamada gerçek pack sıcaklığı yoksa termal bağlam için yardımcı girdi olarak kullanılır.</p></article>
+            <article class="glossary-item" data-terms="thermal proxy termal gösterge proxy"><div class="glossary-term">Termal Gösterge · Thermal Proxy</div><div class="glossary-en">Thermal Proxy</div><p>Gerçek batarya sıcaklığı bilinmediğinde ortam sıcaklığı, park süresi, güneş/gölge ve şarj öncesi sürüşten oluşturulan yaklaşık nitel termal değerlendirmedir.</p></article>
+            <article class="glossary-item" data-terms="cold soak cold-soak soğukta bekleme"><div class="glossary-term">Soğukta Uzun Süre Bekleme · Cold-soak</div><div class="glossary-en">Cold Soak</div><p>Aracın uzun süre düşük ortam sıcaklığında kalarak batarya paketinin de soğumasıdır. Ardından yüksek güçlü şarj yapılması lithium plating riskini artırabilir.</p></article>
+            <article class="glossary-item" data-terms="preconditioning ön koşullandırma batarya ısıtma soğutma"><div class="glossary-term">Batarya Ön Koşullandırma</div><div class="glossary-en">Battery Preconditioning</div><p>Şarj veya sürüş öncesinde bataryanın sıcaklığını hedef çalışma aralığına yaklaştırmak için ısıtılması/soğutulmasıdır. Araç destekliyorsa hızlı şarj performansı ve güvenliği açısından yararlıdır.</p></article>
+            <article class="glossary-item" data-terms="taper charge taper güç düşürme şarj eğrisi"><div class="glossary-term">Şarj Gücü Azaltımı · Taper</div><div class="glossary-en">Charge Taper</div><p>SOC yükseldikçe BMS/şarj sisteminin akımı ve gücü düşürmesidir. Özellikle yüksek SOC'de hücre gerilim limitlerini korur.</p></article>
+            <article class="glossary-item" data-terms="cc cv constant current constant voltage sabit akım sabit gerilim"><div class="glossary-term">CC–CV · Sabit Akım / Sabit Gerilim</div><div class="glossary-en">Constant Current – Constant Voltage</div><p>Lityum-iyon şarjın temel kontrol yaklaşımıdır. Önce akım yaklaşık sabit tutulur; üst hücre gerilimine yaklaşıldığında gerilim sabitlenir ve akım giderek düşer.</p></article>
+            <article class="glossary-item" data-terms="mscc cv multistage constant current çok kademeli"><div class="glossary-term">MSCC–CV · Çok Kademeli CC–CV</div><div class="glossary-en">Multi-Stage Constant Current – Constant Voltage</div><p>Şarj akımının SOC/sıcaklık gibi koşullara göre birden fazla kademede değiştirilip sonunda CV fazına geçildiği şarj protokolüdür.</p></article>
+            <article class="glossary-item" data-terms="thermal runaway termal kaçak"><div class="glossary-term">Termal Kaçak</div><div class="glossary-en">Thermal Runaway</div><p>Isı üreten reaksiyonların kendi kendini hızlandırarak sıcaklığın kontrolsüz yükselmesine yol açmasıdır. Hücre kimyası, tasarım ve termal yönetim davranışı belirler.</p></article>
+          </div>
+        </section>
+
+        <section class="glossary-group">
+          <h3>Uygulamaya özgü indeksler ve veri terimleri</h3>
+          <div class="glossary-grid">
+            <article class="glossary-item" data-terms="bsi battery stress index batarya stres indeksi"><div class="glossary-term">BSI · Batarya Stres İndeksi</div><div class="glossary-en">Battery Stress Index</div><p>Uygulamanın CSI ve CalSI bileşenlerini birleştiren açıklanabilir maruziyet göstergesidir. Düşük değer daha iyidir. BMS SOH değeri veya kalan ömür tahmini değildir.</p></article>
+            <article class="glossary-item" data-terms="csi cycle charge stress index çevrim şarj stres indeksi"><div class="glossary-term">CSI · Çevrim/Şarj Stres İndeksi</div><div class="glossary-en">Cycle/Charge Stress Index</div><p>C-rate, şarj derinliği/ΔSOC ve kullanılan SOC penceresini esas alan uygulama içi stres göstergesidir.</p></article>
+            <article class="glossary-item" data-terms="calsi calendar stress index takvim stres indeksi"><div class="glossary-term">CalSI · Takvim Stres İndeksi</div><div class="glossary-en">Calendar Stress Index</div><p>SOC×zaman ve termal bağlamdan türetilen uygulama içi takvim yaşlanması maruziyet göstergesidir.</p></article>
+            <article class="glossary-item" data-terms="heuristic sezgisel model"><div class="glossary-term">Sezgisel Gösterge · Heuristic</div><div class="glossary-en">Heuristic Indicator</div><p>Doğrudan üretici tarafından kalibre edilmiş fiziksel ömür modeli olmayan; bilimsel bulgulara dayalı, açıklanabilir karar destek yaklaşımıdır.</p></article>
+            <article class="glossary-item" data-terms="data coverage veri kapsamı confidence güven"><div class="glossary-term">Veri Kapsamı / Güven</div><div class="glossary-en">Data Coverage / Confidence</div><p>Bir sonucun ne kadarının gerçek kayıtlarla desteklendiğini ifade eder. Eksik SOC, süre, sıcaklık veya uzun zaman boşlukları varsa güven seviyesi düşürülür.</p></article>
+            <article class="glossary-item" data-terms="rul remaining useful life kalan faydalı ömür"><div class="glossary-term">RUL · Kalan Faydalı Ömür</div><div class="glossary-en">Remaining Useful Life</div><p>Bataryanın belirlenen performans/sağlık eşiğine ulaşmasına kalan tahmini kullanım süresi veya çevrimidir. Mevcut uygulama RUL tahmini yapmaz.</p></article>
+            <article class="glossary-item" data-terms="pack batarya paketi cell hücre module modül"><div class="glossary-term">Hücre / Modül / Paket</div><div class="glossary-en">Cell / Module / Pack</div><p>Hücre en küçük elektrokimyasal birimdir; hücreler modüller, modüller de batarya paketini oluşturabilir. Paket düzeyindeki kW/kWh oranı hücre seviyesindeki gerçek C-rate'in yaklaşık göstergesidir.</p></article>
+            <article class="glossary-item" data-terms="nominal usable capacity nominal kullanılabilir kapasite"><div class="glossary-term">Nominal / Kullanılabilir Kapasite</div><div class="glossary-en">Nominal / Usable Capacity</div><p>Nominal kapasite üreticinin paket için tanımladığı toplam referans enerji değeridir; kullanılabilir kapasite BMS'in üst/alt koruma tamponları nedeniyle sürücünün erişebildiği bölümdür.</p></article>
+          </div>
+        </section>
+      </div>
     </section>
 
     <section id="knowledge" class="panel">
@@ -537,7 +628,7 @@
     </section>
   </main>
 
-  <footer>v0.9.0 · Premium / Apple · Charge Planner · Engineer Edition · Tek kullanıcı giriş kapısı · Firebase Sync · GitHub Pages · iPhone uyumlu · km/SOC eksik geçmiş kayıt desteği · süre→ortalama güç/C-rate</footer>
+  <footer>v0.9.1 · Premium / Apple · Charge Planner · Engineer Edition · Tek kullanıcı giriş kapısı · Firebase Sync · GitHub Pages · iPhone uyumlu · km/SOC eksik geçmiş kayıt desteği · süre→ortalama güç/C-rate</footer>
   </div>
 
   <script src="weather.js"></script>

@@ -357,7 +357,7 @@ function chargeThermalContext(c={}){
   if(parkHours>=4&&(parking==='outdoor-shade'||parking==='outdoor-sun')){confidence='Orta';cls='info';notes.push(`${fmt(parkHours,1)} saat dış ortam parkı nedeniyle ambient proxy daha anlamlı.`)}
   if(parking==='garage'){notes.push('Kapalı otoparkta MGM/Open-Meteo dış sıcaklığı garaj sıcaklığını temsil etmeyebilir; güven düşürüldü.');}
   if(parking==='outdoor-sun'&&parkHours>=1&&ambient>=25){risk+=15;state=ambient>=35?'Aşırı sıcak olası':'Güneş yüküyle sıcak olası';notes.push('Açık hava + güneş maruziyeti termal riski yükseltti.');}
-  if(pre>=20&&ambient<=10){risk=Math.max(0,risk-15);state=ambient<0?'Soğuk, sürüşle kısmen ısınmış olabilir':'Serin/ılımlı olabilir';notes.push(`${fmt(pre,0)} dk şarj öncesi sürüş cold-soak riskini azaltan proxy olarak işlendi.`)}
+  if(pre>=20&&ambient<=10){risk=Math.max(0,risk-15);state=ambient<0?'Soğuk, sürüşle kısmen ısınmış olabilir':'Serin/ılımlı olabilir';notes.push(`${fmt(pre,0)} dk şarj öncesi sürüş soğukta uzun süre bekleme (cold-soak) riskini azaltan proxy olarak işlendi.`)}
   return{known:true,basis:'ambient-proxy',state,confidence,cls,risk:clamp(risk),temp:ambient,notes};
 }
 function chargeStressScore(c){
@@ -495,7 +495,7 @@ function stressIndexFor(charges){
   if(!charges.length)return{score:null,components:[],coverage:stressCoverageFor([]),summary:'Stres hesabı için şarj kaydı ekleyin.',cycle:cycleStressIndexFor([]),calendar:calendarStressIndex([])};
   const cycle=cycleStressIndexFor(charges),calendar=calendarStressIndex(charges),components=[];
   if(cycle.score!=null)components.push({key:'cycle',label:'Cycle / Charge Stress',score:cycle.score,weight:65,detail:cycle.summary});
-  if(calendar.score!=null)components.push({key:'calendar',label:'Calendar Stress',score:calendar.score,weight:35,detail:calendar.summary});
+  if(calendar.score!=null)components.push({key:'calendar',label:'Takvim Stresi',score:calendar.score,weight:35,detail:calendar.summary});
   const w=sum(components.map(x=>x.weight)),score=w?sum(components.map(x=>x.score*x.weight))/w:null,coverage=stressCoverageFor(charges);
   const summary=score==null?'Veri yetersiz':score<20?'Düşük stresli kullanım profili':score<40?'Ilımlı stresli kullanım profili':score<60?'Orta-yüksek stres maruziyeti':score<80?'Yüksek stres maruziyeti':'Çok yüksek stres maruziyeti';
   return{score,components,coverage,summary,cycle,calendar};
@@ -583,7 +583,7 @@ function renderDashboard(){
   byId('stressScoreSummary').innerHTML=`<strong>${sr.summary}</strong>${sr.score!=null?`<div class="muted">Son ${bsi.recentCount} şarj · ${fmt(sr.score,1)}/100 · düşük daha iyi</div>`:''}`;
   byId('stressScoreGauge').style.setProperty('--score',sr.score==null?0:sr.score);
   byId('stressScoreComponents').innerHTML=sr.components.length?sr.components.map(x=>`<div class="score-component"><div class="bar-label"><span>${escapeHtml(x.label)}</span><strong>${fmt(x.score,0)}</strong></div><div class="bar-track stress-track"><div class="bar-fill stress-fill" style="width:${x.score}%"></div></div><div class="component-detail">${escapeHtml(x.detail)}</div></div>`).join(''):'<div class="empty">Stres analizi için veri ekleyin.</div>';
-  byId('lifetimeExposureSummary').innerHTML=`<div class="mini-list"><div class="mini-item"><span>Toplam şarj throughput</span><strong>${fmt(life.total,1)} kWh</strong></div><div class="mini-item"><span>Charge-side EFC proxy</span><strong>${life.chargeEfc!=null?fmt(life.chargeEfc,1):'—'}</strong></div><div class="mini-item"><span>≤1C dışındaki enerji</span><strong>${fmt(life.fast1,1)} kWh${life.fast1Share!=null?' · %'+fmt(life.fast1Share,1):''}</strong></div><div class="mini-item"><span>>2C enerji</span><strong>${fmt(life.fast2,1)} kWh${life.fast2Share!=null?' · %'+fmt(life.fast2Share,1):''}</strong></div><div class="mini-item"><span>>80% SOC bandında eklenen enerji</span><strong>${fmt(life.highSocEnergy,1)} kWh</strong></div></div>`;
+  byId('lifetimeExposureSummary').innerHTML=`<div class="mini-list"><div class="mini-item"><span>Toplam şarj enerji geçişi</span><strong>${fmt(life.total,1)} kWh</strong></div><div class="mini-item"><span>Şarj tarafı EFC göstergesi</span><strong>${life.chargeEfc!=null?fmt(life.chargeEfc,1):'—'}</strong></div><div class="mini-item"><span>≤1C dışındaki enerji</span><strong>${fmt(life.fast1,1)} kWh${life.fast1Share!=null?' · %'+fmt(life.fast1Share,1):''}</strong></div><div class="mini-item"><span>>2C enerji</span><strong>${fmt(life.fast2,1)} kWh${life.fast2Share!=null?' · %'+fmt(life.fast2Share,1):''}</strong></div><div class="mini-item"><span>>80% SOC bandında eklenen enerji</span><strong>${fmt(life.highSocEnergy,1)} kWh</strong></div></div>`;
 
   const ownKm=ownershipKm(),ownerHistory=c.filter(x=>x.scope==='owner_history').length,prev=db.charges.filter(x=>x.scope==='previous_owner').length;
   byId('ownershipSummary').innerHTML=`<div class="mini-list"><div class="mini-item"><span>Sahiplik başlangıcı</span><strong>${db.settings.ownershipStartOdo?fmt(db.settings.ownershipStartOdo,0)+' km':'-'} · %${db.settings.ownershipStartSoc??'-'}${db.settings.ownershipStartDate?' · '+fmtDate(db.settings.ownershipStartDate):''}</strong></div><div class="mini-item"><span>Güncel durum</span><strong>${latestOdo()?fmt(latestOdo(),0)+' km':'-'} · %${db.settings.currentSoc??'-'}</strong></div><div class="mini-item"><span>Sizin dönemde izlenen mesafe</span><strong>${ownKm!=null?fmt(ownKm,0)+' km':'-'}</strong></div><div class="mini-item"><span>Sizin şarj kayıtlarınız</span><strong>${c.length}</strong></div><div class="mini-item"><span>Sonradan girilen geçmiş kayıt</span><strong>${ownerHistory}</strong></div>${prev?`<div class="mini-item"><span>Önceki sahip kaydı</span><strong>${prev}</strong></div>`:''}</div>`;
@@ -717,7 +717,7 @@ function calcPlanner(){
   if(rate<=1)notes.push(`${fmt(power,0)} kW bu bataryada yaklaşık ${fmt(rate,2)}C; düşük/ılımlı charge-rate bölgesidir. AC olması şart değildir.`);
   if(rate>2)notes.push(`${fmt(rate,2)}C planlanan ortalama güç 2C üzerindedir; zaman baskısı yoksa daha düşük ortalama güç cycle stress'i azaltır.`);
   if(context.basis==='ambient-proxy'&&context.state.includes('sıcak')&&D.plannerParking.value==='outdoor-sun')notes.push('Açık güneş parkında sıcak saatler yerine gece/sabah veya kapalı/gölgeli konum daha iyi termal bağlam sağlar.');
-  if(context.basis==='ambient-proxy'&&(context.state.includes('Soğuk')||context.state.includes('soğuk'))&&D.plannerChargeType.value==='DC'&&+D.plannerPreDriveMin.value<20)notes.push('Cold-soak olasılığında yüksek güçlü DC’yi ilk hareket olarak seçmek yerine en az 20–30 dk sürüş sonrası şarj daha iyi bir proxy koşulu sağlar.');
+  if(context.basis==='ambient-proxy'&&(context.state.includes('Soğuk')||context.state.includes('soğuk'))&&D.plannerChargeType.value==='DC'&&+D.plannerPreDriveMin.value<20)notes.push('Soğukta uzun süre bekleme (soğukta uzun süre bekleme (cold-soak)) olasılığında yüksek güçlü DC’yi ilk hareket olarak seçmek yerine en az 20–30 dk sürüş sonrası şarj daha iyi bir yaklaşık termal koşul sağlar.');
   return{current,distance,consumption,reserve,margin,power,rate,cap,tripEnergy,requiredRaw,target,needsRouteCharge,delta,gridEnergy,durationHours,depMs,latestStart,recommendedStart,timing,context,forecastAtStart,forecastAtDeparture,notes};
 }
 function renderPlanner(){
@@ -768,7 +768,7 @@ function renderStress(){
 
   byId('stressCoverage').innerHTML=`<div class="mini-list"><div class="mini-item"><span>SOC şarj verisi kapsamı</span><strong>%${fmt(e.coverage.soc,0)}</strong></div><div class="mini-item"><span>C-rate veri kapsamı</span><strong>%${fmt(e.coverage.crate,0)}</strong></div><div class="mini-item"><span>Termal bağlam kapsamı</span><strong>%${fmt(e.coverage.temp,0)}</strong></div><div class="mini-item"><span>SOC×zaman kapsanan süre</span><strong>${fmt(exp.coveredHours,1)} saat</strong></div><div class="mini-item"><span>Toplam güven göstergesi</span><strong><span class="badge ${e.coverage.cls}">${e.coverage.confidence}</span></strong></div></div><p class="muted">Eksik veri kötü kullanım sayılmaz. SOC×zaman entegrasyonunda 72 saatten uzun boşluklar yok sayılır.</p>`;
   renderBarsOrdered('stressSocBands',socBandEnergy(c),' kWh');renderBarsOrdered('stressCRateBands',cRateBandEnergy(c),' kWh');renderBarsOrdered('stressTempBands',tempBandEnergy(c),' kWh');
-  byId('stressThroughput').innerHTML=`<div class="mini-list"><div class="mini-item"><span>Toplam şarj enerjisi</span><strong>${fmt(e.total,1)} kWh</strong></div><div class="mini-item"><span>Charge-side EFC proxy</span><strong>${e.chargeEfc!=null?fmt(e.chargeEfc,2):'—'}</strong></div><div class="mini-item"><span>%80–100 bandında eklenen enerji</span><strong>${fmt(e.highSocEnergy,1)} kWh</strong></div><div class="mini-item"><span>%90–100 bandında eklenen enerji</span><strong>${fmt(e.above90Energy,1)} kWh</strong></div><div class="mini-item"><span>Yüksek termal proxy (≥50/100) enerji</span><strong>${fmt(e.thermalHigh,1)} kWh</strong></div><div class="mini-item"><span>Maks. ortalama / tepe C-rate</span><strong>${e.maxAvg!=null?fmt(e.maxAvg,2)+'C':'—'} / ${e.maxPeak!=null?fmt(e.maxPeak,2)+'C':'—'}</strong></div></div>`;
+  byId('stressThroughput').innerHTML=`<div class="mini-list"><div class="mini-item"><span>Toplam şarj enerjisi</span><strong>${fmt(e.total,1)} kWh</strong></div><div class="mini-item"><span>Şarj tarafı EFC göstergesi</span><strong>${e.chargeEfc!=null?fmt(e.chargeEfc,2):'—'}</strong></div><div class="mini-item"><span>%80–100 bandında eklenen enerji</span><strong>${fmt(e.highSocEnergy,1)} kWh</strong></div><div class="mini-item"><span>%90–100 bandında eklenen enerji</span><strong>${fmt(e.above90Energy,1)} kWh</strong></div><div class="mini-item"><span>Yüksek termal proxy (≥50/100) enerji</span><strong>${fmt(e.thermalHigh,1)} kWh</strong></div><div class="mini-item"><span>Maks. ortalama / tepe C-rate</span><strong>${e.maxAvg!=null?fmt(e.maxAvg,2)+'C':'—'} / ${e.maxPeak!=null?fmt(e.maxPeak,2)+'C':'—'}</strong></div></div>`;
 
   byId('socTimeStress').innerHTML=exp.coveredHours?`<div class="mini-list"><div class="mini-item"><span>Kapsanan zaman</span><strong>${fmt(exp.coveredHours,1)} saat</strong></div><div class="mini-item"><span>Ortalama SOC proxy</span><strong>%${fmt(exp.avgSoc,1)}</strong></div><div class="mini-item"><span>>80% SOC</span><strong>${fmt(exp.above80Hours,1)} saat · %${fmt(exp.above80Share,1)}</strong></div><div class="mini-item"><span>>90% SOC</span><strong>${fmt(exp.above90Hours,1)} saat · %${fmt(exp.above90Share,1)}</strong></div><div class="mini-item"><span>Uzun veri boşluğu</span><strong>${fmt(exp.ignoredHours,1)} saat (skorlanmadı)</strong></div></div><p class="muted">SOC noktaları arasında doğrusal değişim varsayılır; bu nedenle laboratuvar coulomb-counting ölçümü değil, calendar-aging için saha proxy'sidir.</p>`:'<div class="empty">Zaman damgalı en az iki SOC noktası gerekir.</div>';
   const snaps=[...(db.socSnapshots||[])].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,8);
@@ -934,3 +934,26 @@ D.exportTripsCsv.onclick=()=>exportCsv('surus_kayitlari.csv',['Tarih','Mesafe km
 
 function setDefaultDateTimes(){const now=new Date();const local=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().slice(0,16);if(!D.chargeDate.value)D.chargeDate.value=local;if(!D.consumptionDate.value)D.consumptionDate.value=local;if(!D.tripDate.value)D.tripDate.value=now.toISOString().slice(0,10);if(!D.sohDate.value)D.sohDate.value=now.toISOString().slice(0,10);if(D.plannerDeparture&&!D.plannerDeparture.value){const dep=new Date(now);dep.setDate(dep.getDate()+1);dep.setHours(7,30,0,0);D.plannerDeparture.value=new Date(dep.getTime()-dep.getTimezoneOffset()*60000).toISOString().slice(0,16)}}
 setDefaultDateTimes();if(!D.consumptionOdo.value)D.consumptionOdo.value=db.settings.currentOdo||'';renderAll();
+
+
+// v0.9.1 - glossary search/filter
+const glossarySearch = document.getElementById('glossarySearch');
+const glossaryCount = document.getElementById('glossaryCount');
+function updateGlossaryFilter(){
+  if(!glossarySearch) return;
+  const q=(glossarySearch.value||'').trim().toLocaleLowerCase('tr-TR');
+  const items=[...document.querySelectorAll('.glossary-item')];
+  let visible=0;
+  items.forEach(item=>{
+    const hay=((item.dataset.terms||'')+' '+item.textContent).toLocaleLowerCase('tr-TR');
+    const show=!q||hay.includes(q);
+    item.hidden=!show;
+    if(show) visible++;
+  });
+  document.querySelectorAll('.glossary-group').forEach(group=>{
+    const has=[...group.querySelectorAll('.glossary-item')].some(x=>!x.hidden);
+    group.hidden=!has;
+  });
+  if(glossaryCount) glossaryCount.textContent=q ? `${visible} terim bulundu` : `${items.length} terim`;
+}
+if(glossarySearch){glossarySearch.addEventListener('input',updateGlossaryFilter);updateGlossaryFilter();}
