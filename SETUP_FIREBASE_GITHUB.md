@@ -1,4 +1,4 @@
-# Firebase + GitHub Pages Kurulum Kontrol Listesi — v0.9.4
+# Firebase + GitHub Pages Kurulum Kontrol Listesi — v0.9.5
 
 ## 1. Tamamlananlar
 - Firebase projesi: `t10x-battery-tracker`
@@ -54,7 +54,7 @@ Senkronizasyon doğrulandıktan sonra Safari Paylaş > Ana Ekrana Ekle ile PWA g
 ## 9. Veri güvenliği
 Firebase web config istemci tarafında görünür. Gerçek erişim kontrolü Authentication + Realtime Database Security Rules ile sağlanır.
 
-## Tek kullanıcı modu (v0.9.4)
+## Tek kullanıcı modu (v0.9.5)
 
 Bu sürümde uygulama giriş yapılmadan açılmaz ve web arayüzünde **Hesap Oluştur** seçeneği yoktur.
 
@@ -66,10 +66,10 @@ Bu sürümde uygulama giriş yapılmadan açılmaz ve web arayüzünde **Hesap O
 
 Bu kural, veritabanını yalnızca o UID'ye kilitler. Başka bir Firebase hesabı oluşturulsa dahi T10X veritabanını okuyamaz veya yazamaz.
 
-GitHub'a v0.9.4 dosyalarını yükledikten sonra önceki service worker önbelleği nedeniyle eski ekranı görürseniz sayfayı yenileyin. Ana ekrana eklenmiş iPhone sürümünde uygulamayı tamamen kapatıp yeniden açmak da yeni service worker'ın devreye girmesini hızlandırır.
+GitHub'a v0.9.5 dosyalarını yükledikten sonra önceki service worker önbelleği nedeniyle eski ekranı görürseniz sayfayı yenileyin. Ana ekrana eklenmiş iPhone sürümünde uygulamayı tamamen kapatıp yeniden açmak da yeni service worker'ın devreye girmesini hızlandırır.
 
 
-## v0.9.4 ek notlar
+## v0.9.5 ek notlar
 - `weather.js` GitHub Pages üzerinde otomatik hava sorgusu için gereklidir; repo kökünde tutulmalıdır.
 - Konum izni yalnızca HTTPS/GitHub Pages (ve localhost geliştirme ortamı) üzerinde çalışır.
 - Uygulama konum koordinatlarını Firebase veri modeline yazmaz.
@@ -77,10 +77,10 @@ GitHub'a v0.9.4 dosyalarını yükledikten sonra önceki service worker önbelle
 - Eski v0.8 verileri uygulama tarafından şema 10'a migrate edilir. JSON yedeğini yine de koruyun.
 
 
-**v0.9.4:** GitHub Pages kök klasörüne `soc-model.js` ve yeni `consumption-model.js` dosyalarını koyun. Firebase kuralları değişmez. v12 veri modeli local/bulut v11 verilerini okuyabilir.
+**v0.9.5:** GitHub Pages kök klasörüne `soc-model.js` ve yeni `consumption-model.js` dosyalarını koyun. Firebase kuralları değişmez. v12 veri modeli local/bulut v11 verilerini okuyabilir.
 
 
-## v0.9.4 sürüm geçişi
+## v0.9.5 sürüm geçişi
 
 1. Önce Dashboard > JSON Yedekle ile yedek alın.
 2. ZIP içindeki **tüm** dosyaları (özellikle `consumption-model.js`, `app.js`, `index.html`, `app.css`, `sw.js`) mevcut GitHub Pages deposunun kök dizinine yerleştirin.
@@ -90,9 +90,20 @@ GitHub'a v0.9.4 dosyalarını yükledikten sonra önceki service worker önbelle
 6. Firebase Authentication veya Database Rules üzerinde değişiklik gerekmez.
 
 
-## v0.9.4 — Dashboard tüketim değişikliği
+## v0.9.5 — Dashboard tüketim değişikliği
 
 - GitHub Pages kök klasörüne yeni `consumption-model.js` dosyasını da yükleyin. `index.html`, `app.js`, `app.css`, `sw.js` ve `README.md` dosyalarını güncelleyin.
 - Firebase Security Rules veya kimlik doğrulama ayarları **değişmedi**. Yeni ayarlar aynı `users/<uid>/appData.settings` altında saklanır; şema v13'e yükselir ve eski kayıtlar korunur.
 - Önce JSON yedeği alın. iPhone Safari'de önbelleğe takılırsa sayfayı tamamen yeniden yükleyin veya kurulu ana ekran kısayolunu kapatıp açın.
 - Dashboard'daki “Şarjlarım eksiksiz” kutusunu yalnızca sahiplik başlangıcından bugüne tüm şarjların kWh değerlerini girdiyseniz işaretleyin. Hesap yaklaşık enerji dengesi tahminidir; üretici BMS verisinin yerine geçmez.
+
+
+## v0.9.5 — SOH ve teknik denetim geçişi
+
+1. Önce uygulamadaki **JSON yedeğini** kaydedin.
+2. ZIP içindeki klasörün **içindeki tüm dosyaları** GitHub Pages deponuzun köküne yükleyin. Özellikle **`soh-model.js`**, `app.js`, `index.html`, `sw.js` ve mevcut `soc-model.js` / `consumption-model.js` eksik kalmamalı.
+3. Firebase config, tek-kullanıcı UID ve Database Rules dosyaları değişmedi. Bunları gevşetmeyin; yeni rules yayımlamak gerekmez.
+4. v0.9.4 yerel/veritabanı nesneleri şema v14'e dönüştürülür; eski SOH testleri `legacy` olarak korunur. Bunların yüzdesi artık BMS/servis SOH kartına dahil edilmez.
+5. İlk açılışta **SOH Testleri → Veri Türü** menüsünü kontrol edin. Şarj kaybını bilmiyorsanız boş bırakın.
+6. iPhone Safari eski dosyaları gösterirse uygulamayı tamamen kapatıp yeniden açın. Firebase oturumunu ve eski kayıtların yerinde olduğunu doğrulayın.
+7. `TEKNIK_DENETIM_NOTLARI.md` bulgularını ve halen kalibre edilmemiş modelleri okuyun.

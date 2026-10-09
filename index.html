@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="T10X Batarya" />
   <meta name="mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="manifest.webmanifest" />
-  <title>T10X Batarya & Şarj Takip v0.9.4 · Premium / Apple · Charge Planner</title>
+  <title>T10X Batarya & Şarj Takip v0.9.5 · Premium / Apple · Charge Planner</title>
   <link rel="stylesheet" href="app.css" />
 </head>
 <body>
@@ -65,13 +65,13 @@
       <div class="cards" id="dashboardCards"></div>
       <div class="grid two">
         <article class="card health-score-card">
-          <div class="card-head"><h2>Batarya Sağlık Skoru</h2><span id="healthConfidence" class="badge neutral"></span></div>
+          <div class="card-head"><h2>Kullanım Profili Skoru</h2><span id="healthConfidence" class="badge neutral"></span></div>
           <div class="health-score-wrap">
             <div id="healthScoreGauge" class="score-gauge"><span id="healthScoreValue">—</span><small>/100</small></div>
             <div id="healthScoreSummary" class="health-summary"></div>
           </div>
           <div id="healthScoreComponents" class="score-components"></div>
-          <p class="muted">Bu skor BMS tarafından ölçülen SOH değildir; ölçülen SOH, SOC disiplini ve şarj stresi verilerinden oluşturulan açıklanabilir bir takip göstergesidir.</p>
+          <p class="muted">Bu skor yalnızca kaydedilmiş şarj/park koşullarının açıklanabilir indeksidir. Bataryanın kalan kapasitesini (SOH) veya ömrünü ölçmez. Doğrulanmış SOH, ayrı kartta gösterilir.</p>
         </article>
         <article class="card">
           <div class="card-head"><h2>Sahiplik Dönemi</h2></div>
@@ -263,25 +263,29 @@
     </section>
 
     <section id="soh" class="panel">
-      <div class="info-box">
-        <strong>SOH burada saha tahminidir.</strong> SOC farkı üzerinden bataryaya giden net enerji ölçeklenerek kapasite tahmin edilir. Geniş SOC aralığı, AC şarj ve ılımlı sıcaklık sonucu daha güvenilir yapar; BMS/servis ölçümü referans olmaya devam eder.
-      </div>
+      <div class="info-box"><strong>SOH, batarya kullanım profiliyle aynı şey değildir.</strong> BMS/servis SOH raporu varsa doğrudan kaydedin. Yalnızca istasyon kWh verisi varsa şarj kaybını bilmediğiniz için hesap ancak <strong>varsayımsal duyarlılık senaryosu</strong> olabilir; bunu ölçülmüş SOH olarak kabul etmiyoruz. Eski kayıtlarınız silinmez, fakat eski varsayımlı sonuçlar artık SOH ölçümü yerine kullanılmaz.</div>
       <form id="sohForm" class="form-card">
         <div class="form-grid">
-          <label>Tarih<input id="sohDate" type="date" required></label>
-          <label>Başlangıç SOC (%)<input id="sohStartSoc" type="number" min="0" max="100" step="1" required></label>
-          <label>Bitiş SOC (%)<input id="sohEndSoc" type="number" min="0" max="100" step="1" required></label>
-          <label>Sayaçtan Alınan Enerji (kWh)<input id="sohEnergy" type="number" min="0" step="0.01" required></label>
-          <label>Şarj Türü<select id="sohType"><option>AC</option><option>DC</option></select></label>
-          <label>Tahmini Şarj Kaybı (%)<input id="sohLoss" type="number" min="0" max="30" step="0.1" value="8"></label>
-          <label>Ortam Sıcaklığı (°C)<input id="sohTemp" type="number" step="0.1" placeholder="Örn. 22"></label>
+          <label>Test Tarihi<input id="sohDate" type="date" required></label>
+          <label>Veri Türü<select id="sohMethod"><option value="meter">Şarj istasyonu/sayaç enerjisi (senaryo)</option><option value="bms">BMS veya servis SOH raporu</option><option value="net">Gerçek ölçülmüş net batarya enerjisi</option></select></label>
+          <label data-soh-mode="bms">BMS / Servis SOH (%)<input id="sohMeasuredSoh" type="number" min="0.1" max="120" step="0.1" placeholder="Rapor varsa girin"></label>
+          <label data-soh-mode="meter net">Başlangıç SOC (%)<input id="sohStartSoc" type="number" min="0" max="100" step="1"></label>
+          <label data-soh-mode="meter net">Bitiş SOC (%)<input id="sohEndSoc" type="number" min="0" max="100" step="1"></label>
+          <label data-soh-mode="meter">İstasyon Sayacından Alınan Enerji (kWh)<input id="sohEnergy" type="number" min="0.01" step="0.01"></label>
+          <label data-soh-mode="meter">Şarj Türü<select id="sohType"><option>AC</option><option>DC</option></select></label>
+          <label data-soh-mode="meter">Gerçekten ölçülmüş şarj kaybı (%) · varsa<input id="sohLoss" type="number" min="0" max="30" step="0.1" placeholder="Bilinmiyorsa boş bırakın"></label>
+          <label data-soh-mode="net">Bataryaya Geçen NET Ölçülmüş Enerji (kWh)<input id="sohNetEnergy" type="number" min="0.01" step="0.01" placeholder="BMS/ölçüm cihazı verisi"></label>
+          <label data-soh-mode="meter net">Doğrulanmış yeni-batarya kullanılabilir kapasitesi (kWh) · varsa<input id="sohReference" type="number" min="0.1" max="150" step="0.1" placeholder="Yoksa boş bırakın; 88,5 nominal referans olmaz"></label>
+          <label>Ortam Sıcaklığı (°C) · isteğe bağlı<input id="sohTemp" type="number" step="0.1" placeholder="Örn. 22"></label>
           <label>Kilometre<input id="sohOdo" type="number" min="0" step="1"></label>
+          <label class="span-2">Ölçüm Kaynağı (örn. Togg servis raporu)<input id="sohSource" type="text" placeholder="İsteğe bağlı ama BMS kaydı için önerilir"></label>
           <label class="span-2">Not<input id="sohNotes" type="text"></label>
         </div>
         <div id="sohPreview" class="calculation-preview"></div>
-        <div class="form-actions"><button type="submit">SOH Testini Kaydet</button></div>
+        <div class="form-actions"><button type="submit">SOH / Kapasite Kaydını Kaydet</button></div>
       </form>
-      <div class="table-wrap"><table><thead><tr><th>Tarih</th><th>SOC</th><th>Net Batarya Enerjisi</th><th>Tahmini Kapasite</th><th>SOH</th><th>Test Kalitesi</th><th>Km</th><th></th></tr></thead><tbody id="sohTable"></tbody></table></div>
+      <div class="info-box"><strong>Metodolojik not:</strong> AC için örnek %5–15, DC için örnek %2–12 kayıp senaryosu yalnızca duyarlılık göstergesidir; üreticinin ölçülmüş kayıp oranları veya istatistiksel güven aralığı değildir. Net enerji ölçümü olmadan kesin kullanılabilir kapasite ve SOH hesaplanmaz. <a href="https://doi.org/10.1002/ese3.1581" target="_blank" rel="noopener">SOH ölçüm metodolojisi</a>.</div>
+      <div class="table-wrap"><table><thead><tr><th>Tarih</th><th>Veri türü / dayanak</th><th>SOC</th><th>Net Enerji</th><th>Kapasite</th><th>SOH / Karşılaştırma</th><th>Km</th><th></th></tr></thead><tbody id="sohTable"></tbody></table></div>
     </section>
 
     <section id="crate" class="panel">
@@ -429,12 +433,12 @@
 
       <details class="report-section"><summary>11 · EFC, enerji geçişi (throughput) ve neden BSI'den ayrı tutuluyor?</summary><div class="report-body">
         <p><strong>Equivalent Full Cycle (EFC/FEC)</strong>, kullanım miktarını normalize etmek için yararlıdır. Uygulamada yalnızca şarj enerjisi güvenilir biçimde bilindiği için “charge-side EFC proxy” hesaplanır:</p>
-        <div class="equation">EFC_charge ≈ ΣE_charge / E_reference</div>
-        <p>Bu değer degradation şiddeti değildir; 100 EFC düşük stresli de yüksek stresli de olabilir. Bu nedenle EFC, BSI'yi otomatik yükselten bir bileşen değil, kümülatif maruziyet göstergesidir. 2026 stress-factor çalışması da SOC, DOD, sıcaklık ve C-rate etkilerini ayrıştırmanın, tek bir toplam cycle sayısından daha açıklayıcı olduğunu vurgular.</p>
+        <div class="equation">Gösterge = ΣE_istasyon(kWh) / E_nominal(kWh) ; hücre EFC ölçümü değildir</div>
+        <p>Bu oran hücrede gerçekleşen gerçek şarj/deşarj enerji geçişi, tam eşdeğer çevrim (EFC) veya degradation şiddeti değildir. Bu nedenle EFC, BSI'yi otomatik yükselten bir bileşen değil, kümülatif maruziyet göstergesidir. 2026 stress-factor çalışması da SOC, DOD, sıcaklık ve C-rate etkilerini ayrıştırmanın, tek bir toplam cycle sayısından daha açıklayıcı olduğunu vurgular.</p>
       </div></details>
 
       <details class="report-section"><summary>12 · Uygulamadaki CSI, CalSI ve Batarya Stres İndeksi (BSI) nasıl çalışıyor?</summary><div class="report-body">
-        <p>v0.9 ile stres modeli iki fiziksel eksene ayrılmıştır. <strong>Cycle / Charge Stress Index (CSI)</strong>; enerji-ağırlıklı C-rate maruziyeti, şarj derinliği (ΔSOC) ve SOC penceresinin konumunu değerlendirir. <strong>Takvim Stres İndeksi (CalSI)</strong> ise mümkün olduğunda SOC×zaman maruziyetini ve termal bağlamı kullanır. Genel <strong>BSI = %65 CSI + %35 CalSI</strong> olarak sunulur. Bunlar literatürden doğrudan alınmış ömür-regresyon katsayıları değil, bileşenleri açık bir saha takip indeksidir.</p>
+        <p>v0.9 ile stres modeli iki fiziksel eksene ayrılmıştır. <strong>Cycle / Charge Stress Index (CSI)</strong>; veri eksikse oturum-ağırlıklı, enerji verileri tam ise enerji-ağırlıklı C-rate maruziyeti, şarj derinliği (ΔSOC) ve SOC penceresinin konumunu değerlendirir. <strong>Takvim Stres İndeksi (CalSI)</strong> ise mümkün olduğunda SOC×zaman maruziyetini ve termal bağlamı kullanır. Genel <strong>BSI = %65 CSI + %35 CalSI</strong> olarak sunulur. Bunlar literatürden doğrudan alınmış ömür-regresyon katsayıları değil, bileşenleri açık bir saha takip indeksidir.</p>
         <ul><li>AC/DC etiketi BSI bileşeni değildir. 50 kW DC ile 180 kW DC, ölçülen/hesaplanan C-rate'e göre farklı değerlendirilir.</li><li>%20–80 bir koruma bandıdır; %20'ye düşmeyi beklemek veya her şarjı %80'e tamamlamak zorunlu değildir. Sığ çevrimler düşük ΔSOC stresi alır.</li><li>%80–90 ve özellikle %90–100 bölgeleri, aynı ΔSOC için daha yüksek SOC-pencere ağırlığı alır.</li><li>C-rate skoru doğrusal olmayan artar; 2C üzerindeki maruziyet daha güçlü, 4C+ en yüksek banttadır.</li><li>Soğuk + yüksek C-rate ve sıcak + yüksek SOC kombinasyonları termal/calendar stresini artırır.</li><li>SOC×zaman hesabı yalnızca yeterli zaman damgalı gözlem varsa kullanılır; uzun veri boşlukları otomatik olarak kapsam dışında bırakılır.</li></ul>
         <p><strong>Önemli:</strong> BSI, SOH veya RUL değildir. Hücre iç sıcaklığı, gerçek pack current, hücre min/max gerilimleri ve BMS resistance/capacity parametreleri erişilebilir hale gelirse model fiziksel olarak çok daha güçlü hale getirilebilir.</p>
       </div></details>
@@ -597,14 +601,14 @@
           <p><a href="https://doi.org/10.1016/j.tsep.2024.102436" target="_blank" rel="noopener">Saeed et al., Thermal Science and Engineering Progress, 2024 – calendar aging</a></p>
         </article>
         <article class="card">
-          <h2>5. Batarya Sağlık Skoru</h2>
-          <p>Skor, ölçülmüş SOH ile SOC çalışma profili, cycle/charge stresi ve termal bağlamı birleştirir. AC/DC oranı skor bileşeni değildir. SOC×zaman verisi yeterli olduğunda yüksek SOC’de bekleme davranışı da değerlendirmeye katılır.</p>
+          <h2>5. Kullanım Profili Skoru</h2>
+          <p>Skor, yalnızca SOC çalışma profili, cycle/charge stresi ve termal bağlamı birleştirir; ölçülen SOH ile toplanmaz. AC/DC oranı skor bileşeni değildir. SOC×zaman verisi yeterli olduğunda yüksek SOC’de bekleme davranışı da değerlendirmeye katılır.</p>
           <p><strong>Önemli:</strong> Bu puan bir laboratuvar veya BMS sağlık ölçümü değildir; kullanım alışkanlıklarını ve saha SOH testlerini tek ekranda izlemek için oluşturulmuş karar destek göstergesidir.</p>
         </article>
         <article class="card">
           <h2>6. SOH hesabı nasıl yapılıyor?</h2>
-          <p>SOH testi, şarj cihazından alınan enerjiyi tahmini şarj kaybıyla düzelterek bataryaya giden net enerjiyi bulur; bunu SOC farkına ölçekleyerek tahmini kullanılabilir kapasiteyi hesaplar. SOH = tahmini kapasite / referans kapasite.</p>
-          <p><strong>Kalite puanı:</strong> SOC farkı ≥60 puan, AC şarj ve 15–30 °C civarı testler daha yüksek güvenilirlik alır. Sonuç, BMS diagnostik ölçümünün yerine geçmez.</p>
+          <p>İstasyon sayacı enerjisi bataryaya geçen net enerji değildir. Net enerji ölçülmemişse AC/DC için yalnızca örnek şarj kaybı senaryolarından kapasite aralığı hesaplanır. Kalan kapasiteyi SOH diye adlandırmak için karşılaştırılabilir doğrulanmış yeni-batarya kullanılabilir kapasite referansı gerekir. BMS/servis SOH ölçümü ayrı kaydedilir.</p>
+          <p><strong>Kalite puanı:</strong> Geniş SOC aralığı tek başına ölçülmeyen şarj kaybını veya referans kapasite belirsizliğini gidermez. Eski testler korunur ama varsayımlı SOH ölçümü olarak gösterilmez.</p>
         </article>
       </div>
       <div class="info-box"><strong>Bilimsel sınır:</strong> Literatür “iki DC'den sonra üç AC” gibi bir zorunluluk tanımlamaz. v0.9 ile bu davranış kaldırılmıştır. Öneriler artık C-rate, SOC penceresi, SOC×zaman, gerçek/temsili termal durum ve planlanan enerji ihtiyacına dayanır.</div>
@@ -631,7 +635,7 @@
         <label>Planlayıcı Varsayılan Rezerv SOC (%)<input id="plannerReserveDefault" type="number" min="0" max="40" step="1"></label>
         <label>Planlayıcı Varsayılan Güvenlik Payı (%)<input id="plannerMarginDefault" type="number" min="0" max="50" step="1"></label>
         <label>MGM Referans Şehri<input id="mgmCity" type="text" placeholder="ANKARA"></label>
-        <p class="muted">Sahiplik başlangıç km'si önceki sahibin kullanımını sizin analizinizden ayırır. %20–80 alanları artık “koruma bandı” olarak kullanılır; uygulama sizi %20’ye düşmeyi beklemeye veya her seferinde %80’e çıkmaya zorlamaz. AC/DC oranı sağlık skorunda kullanılmaz; C-rate ve termal bağlam esas alınır. 88,5 kWh nominal referanstır; doğrulanmış kullanılabilir kapasite elde edilirse SOH referansını güncelleyin.</p>
+        <p class="muted">Sahiplik başlangıç km'si önceki sahibin kullanımını sizin analizinizden ayırır. %20–80 alanları artık “koruma bandı” olarak kullanılır; uygulama sizi %20’ye düşmeyi beklemeye veya her seferinde %80’e çıkmaya zorlamaz. AC/DC oranı sağlık skorunda kullanılmaz; C-rate ve termal bağlam esas alınır. 88,5 kWh nominal referanstır; SOH hesabında yeni-bataryanın doğrulanmış kullanılabilir kapasitesiyle aynı şey değildir.</p>
         <div class="form-actions"><button type="submit">Ayarları Kaydet</button><button type="button" id="clearAllBtn" class="danger">Tüm Verileri Sil</button></div>
       </form>
 
@@ -655,12 +659,13 @@
     </section>
   </main>
 
-  <footer>v0.9.4 · Premium / Apple · Charge Planner · Engineer Edition · Tek kullanıcı giriş kapısı · Firebase Sync · GitHub Pages · iPhone uyumlu · km/SOC eksik geçmiş kayıt desteği · süre→ortalama güç/C-rate</footer>
+  <footer>v0.9.5 · Premium / Apple · Charge Planner · Engineer Edition · Tek kullanıcı giriş kapısı · Firebase Sync · GitHub Pages · iPhone uyumlu · km/SOC eksik geçmiş kayıt desteği · süre→ortalama güç/C-rate</footer>
   </div>
 
   <script src="weather.js"></script>
   <script src="soc-model.js"></script>
   <script src="consumption-model.js"></script>
+  <script src="soh-model.js"></script>
   <script src="app.js"></script>
   <script type="module" src="firebase-sync.js"></script>
   <script>

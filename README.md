@@ -1,4 +1,4 @@
-# T10X Batarya & Şarj Takip v0.9.4 — NMC Decision Support
+# T10X Batarya & Şarj Takip v0.9.5 — SOH Evidence & Audit
 
 Kişisel T10X (88,5 kWh NMC) kullanımı için local-first + Firebase senkronizasyonlu, iPhone/PWA uyumlu batarya ve şarj takip uygulaması.
 
@@ -49,11 +49,11 @@ Repo köküne bu klasörün içindeki dosyaları yükleyin.
 
 Settings > Pages > Deploy from a branch > `main` / `(root)`
 
-Yeni service-worker cache anahtarı `t10x-battery-v0.9.4-consumption-energy-balance` olarak güncellendi; önceki sürümlerin önbellekleri aktivasyon sırasında temizlenir.
+Yeni service-worker cache anahtarı `t10x-battery-v0.9.5-soh-audit` olarak güncellendi; önceki sürümlerin önbellekleri aktivasyon sırasında temizlenir.
 
 ## Bilimsel sınır
 
-Uygulamadaki CSI, CalSI, BSI ve Batarya Sağlık Skoru üretici BMS algoritması değildir. Bunlar literatürde tanımlanan mekanizmaları saha verisine açıklanabilir biçimde uygulayan karar-destek göstergeleridir. Gerçek hücre sıcaklığı, pack current, hücre gerilim dağılımları ve üretici SOH/DCIR verileri erişilebilir hale gelirse model geliştirilebilir.
+Uygulamadaki CSI, CalSI, BSI ve Kullanım Profili Skoru üretici BMS algoritması değildir. Bunlar literatürde tanımlanan mekanizmaları saha verisine açıklanabilir biçimde uygulayan karar-destek göstergeleridir. Gerçek hücre sıcaklığı, pack current, hücre gerilim dağılımları ve üretici SOH/DCIR verileri erişilebilir hale gelirse model geliştirilebilir.
 
 
 ## v0.9.1 - Terimler ve Kısaltmalar
@@ -114,3 +114,20 @@ Toplam sahiplik tüketimi iki ayrı kanıt seviyesinde hesaplanır:
 Formül: `E_tüketim ≈ Σ(E_AC × η_AC) + Σ(E_DC × η_DC) + (SOC_ilk − SOC_son) × E_kullanılabilir / 100`. Ardından `kWh/100km = E_tüketim × 100 / toplam kilometre`. Varsayılan η_AC=%90, η_DC=%96; bunlar T10X’e özel laboratuvarla doğrulanmış değerler değil, değiştirilebilir mühendislik varsayımlarıdır. 88,5 kWh nominal referanstır; gerçek kullanılabilir kapasite farklı olabilir.
 
 Eksik kWh, tutarsız enerji dengesi veya başlangıç/güncel SOC/odometre yoksa sahte bir toplam sunulmaz. Eski manuel `total` değerleri korunur ancak hesaplamalarda kullanılmaz.
+
+
+## v0.9.5 · SOH metodoloji ve gösterge denetimi
+
+- SOH girişleri **BMS/servis beyanı**, **ölçülmüş net batarya kWh** ve **istasyon kWh (duyarlılık senaryosu)** olarak ayrıldı. Şarj kaybı artık zorunlu/değerli varsayılan alan değil; boş bırakılırsa örnek AC %5–15 ve DC %2–12 *kullanıcıyı yönlendirmeyen duyarlılık senaryoları* gösterilir. Bunlar T10X için doğrulanmış verim veya güven aralığı değildir.
+- 88,5 kWh nominal paket kapasitesi otomatik yeni-batarya **kullanılabilir** SOH referansı olarak alınmaz. Referans yoksa SOH yüzdesi hesaplanmaz.
+- Geçmiş SOH testleri korunur fakat eski tek-değerli varsayımlı SOH sonuçları referans/sağlık ölçümü dışında tutulur.
+- BMS/servis SOH değerleri uygulama tarafından bağımsız doğrulanmaz; kullanıcı tarafından sağlanan rapor ölçümüdür.
+- Kullanım Profili Skoru (heuristic) ve SOH ölçümü tamamen ayrıldı. Profil skoru kapasite kaybı veya gelecekteki ömrü ölçmez.
+- Enerji toplamları, kWh eksik şarjlarda SOC farkından kWh uydurmaz. Gözlenmiş enerji kapsamı gösterilir.
+- 100 km maliyet, istasyondan alınan şebeke enerjisi ile bataryanın kullandığı enerji ayrımına göre AC/DC verim varsayımı üzerinden yaklaşık hesaplanır. Bu bir fatura tahmini değil, analitik gösterge.
+- Service worker yalnız aynı origin'deki başarılı statik kaynakları önbellekler; Firebase/kimlik/hava verisini önbelleklemez.
+- Analizler / Stres / Planlayıcı için sıcaklık, güç, SOC, enerji varsayımları hâlâ gözlemsel göstergelerdir. Kalibre edilmiş hücre ömür modeli olmadığı için SOH veya RUL öngörmez.
+
+**Kaynaklar:** DOI:10.1002/ese3.1581 (SOC/SOH referans test prosedürleri), DOI:10.1016/j.energy.2017.03.015 (şarj verimliliğinin ölçüme ve donanıma bağımlılığı).
+
+**Teknik denetim:** Detay ve kısıtlar için `TEKNIK_DENETIM_NOTLARI.md` dosyasına bakınız.
