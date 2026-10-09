@@ -1,8 +1,8 @@
-# T10X Batarya & Şarj Takip v0.9.1 — NMC Decision Support
+# T10X Batarya & Şarj Takip v0.9.2 — NMC Decision Support
 
 Kişisel T10X (88,5 kWh NMC) kullanımı için local-first + Firebase senkronizasyonlu, iPhone/PWA uyumlu batarya ve şarj takip uygulaması.
 
-## v0.9.1 ana değişiklikleri
+## v0.9.2 ana değişiklikleri
 
 - **AC/DC artık sağlık skoru değildir.** DC/AC oranı istatistik olarak kalır; batarya stresi C-rate, SOC penceresi, şarj derinliği ve termal bağlamla değerlendirilir.
 - **Düşük güçlü DC ayrı değerlendirilir.** Örn. 50 kW DC yaklaşık 0,56C, 180 kW yaklaşık 2,03C teorik paket oranıdır.
@@ -49,16 +49,26 @@ Repo köküne bu klasörün içindeki dosyaları yükleyin.
 
 Settings > Pages > Deploy from a branch > `main` / `(root)`
 
-Yeni service-worker cache adı `t10x-battery-v0.9.1-planner` olduğundan eski v0.8.x önbellekleri aktivasyon sırasında temizlenir.
+Yeni service-worker cache adı `t10x-battery-v0.9.2-planner` olduğundan eski v0.8.x önbellekleri aktivasyon sırasında temizlenir.
 
 ## Bilimsel sınır
 
 Uygulamadaki CSI, CalSI, BSI ve Batarya Sağlık Skoru üretici BMS algoritması değildir. Bunlar literatürde tanımlanan mekanizmaları saha verisine açıklanabilir biçimde uygulayan karar-destek göstergeleridir. Gerçek hücre sıcaklığı, pack current, hücre gerilim dağılımları ve üretici SOH/DCIR verileri erişilebilir hale gelirse model geliştirilebilir.
 
 
-## v0.9.1 - Terimler ve Kısaltmalar
+## v0.9.2 - Terimler ve Kısaltmalar
 
 - Ayrı **Terimler & Kısaltmalar** menüsü eklendi.
 - 40+ teknik terim Türkçe karşılığı, İngilizce adı/kısaltması ve uygulamadaki pratik anlamıyla açıklanır.
 - Arama kutusu ile terimler filtrelenebilir.
 - Kullanıcı arayüzünde bazı İngilizce teknik ifadeler Türkçe öncelikli hale getirildi (ör. Enerji Geçişi / Throughput, Batarya Stres İndeksi / BSI).
+
+
+## v0.9.2 - C-rate göstergeleri ve kayıt bağlamı
+
+- **En Yüksek Şarj Ortalaması (C-rate):** Sahiplik dönemi oturumlarında enerji/süre ile ölçülebilen ortalama C-rate değerlerinin maksimumu. Tarih, sağlayıcı ve seans ortalama kW'si gösterilir.
+- **En Yüksek Anlık Şarj Hızı (C-rate):** Girilmiş opsiyonel maksimum güçten hesaplanan tepe C-rate'lerin maksimumu. Tarih, sağlayıcı ve maksimum kW gösterilir.
+- **Enerji Ağırlıklı Ortalama C-rate:** Yalnız hem istasyondan alınan kWh hem şarj süresi mevcut olan oturumlarda Σ(enerji × oturum ortalama C-rate) / Σ(enerji). Eksik kayıtlar değere sıfır olarak katılmaz; kapsanan kWh ve oturum sayısı gösterilir.
+- Metrikler Gösterge Paneli, Analizler ve Stres Analizi içinde tutarlıdır. Bu gösterimler geçmiş Firebase verilerini veya batarya stres puanı formüllerini değiştirmez.
+- Önceki sahip kayıtları kullanıcıya ait şarj istatistiklerinin dışında kalır.
+- Service worker sürümü `t10x-battery-v0.9.2-crate-metrics` olarak güncellendi.

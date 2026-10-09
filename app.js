@@ -285,6 +285,52 @@ function chargePeakCRate(c){return cRate(c.power)}
 function chargeCRate(c){return chargeAverageCRate(c)??chargePeakCRate(c)}
 function chargeCRateSource(c){return chargeAverageCRate(c)!=null?'ortalama':chargePeakCRate(c)!=null?'maksimum':'yok'}
 
+// v0.9.2: Display-only metrics. Stored charges and BSI/CSI formulas remain unchanged.
+// An energy-weighted mean uses observed station kWh, not inferred SOC-based kWh
+// and never treats an optional peak power as an average power.
+function chargeHistoryCRateMetrics(charges){
+  const candidateMax=(rateFn)=>{
+    let best=null;
+    for(const charge of charges){
+      const rate=rateFn(charge);
+      if(rate!=null&&Number.isFinite(rate)&&(best===null||rate>best.rate))best={charge,rate};
+    }
+    return best;
+  };
+  const knownEnergy=charges.filter(c=>Number.isFinite(Number(c.energy))&&Number(c.energy)>0);
+  let coveredEnergy=0,weightedSum=0,coveredSessions=0;
+  for(const c of knownEnergy){
+    const rate=chargeAverageCRate(c);
+    if(rate===null||!Number.isFinite(rate))continue;
+    const energy=Number(c.energy);
+    coveredEnergy+=energy;
+    weightedSum+=energy*rate;
+    coveredSessions++;
+  }
+  const totalKnownEnergy=sum(knownEnergy.map(c=>Number(c.energy)));
+  return{
+    maxAverage:candidateMax(chargeAverageCRate),
+    maxPeak:candidateMax(chargePeakCRate),
+    weightedAverage:coveredEnergy>0?weightedSum/coveredEnergy:null,
+    coveredEnergy,totalKnownEnergy,coveredSessions,
+    knownEnergySessions:knownEnergy.length,
+    allSessions:charges.length
+  };
+}
+function chargeCRateSessionDetail(candidate,{peak=false}={}){
+  if(!candidate)return peak?'Maksimum güç girildiğinde':'Enerji ve şarj süresi girildiğinde';
+  const c=candidate.charge;
+  const power=peak?Number(c.power):chargeAveragePower(c);
+  const parts=[`${fmt(power,1)} kW`,String(c.provider||'Sağlayıcı belirtilmedi'),c.date?fmtDate(c.date):'Tarih belirtilmedi'];
+  return parts.map(escapeHtml).join(' · ');
+}
+function weightedCRateDetail(stats){
+  if(stats.weightedAverage==null)return 'Enerji ve süre bilgisi olan şarj kaydı gerekli';
+  const pct=stats.totalKnownEnergy>0?` · %${fmt(stats.coveredEnergy/stats.totalKnownEnergy*100,0)} kapsam`:'';
+  return `${fmt(stats.coveredEnergy,1)} / ${fmt(stats.totalKnownEnergy,1)} kWh ölçülen enerji · ${stats.coveredSessions}/${stats.allSessions} oturum${pct}`;
+}
+
+
 function sohQuality(start,end,type,temp){
   const delta=Number(end)-Number(start);let score=0;const reasons=[];
   if(delta>=60){score+=2;reasons.push('geniş SOC aralığı');}
@@ -554,7 +600,7 @@ function renderDashboard(){
   const c=ownerCharges(),soh=referenceSoh(),cons=latestConsumptionSnapshot(),cost100=costPer100Metrics(),life=lifetimeExposureMetrics();
   const energyTotal=sum(c.map(chargeEnergyValue)),dcEnergy=sum(c.filter(x=>x.type==='DC').map(chargeEnergyValue));
   const socCharges=c.filter(hasSocPair),complianceWeighted=socCharges.length?avg(socCharges.map(x=>chargeCompliance(x).ratio))*100:null;
-  const avgRates=c.map(chargeAverageCRate).filter(x=>x!=null),peakRates=c.map(chargePeakCRate).filter(x=>x!=null);
+  const cRateHistory=chargeHistoryCRateMetrics(c);
   const cards=[
     ['Kilometre',latestOdo()?fmt(latestOdo(),0)+' km':'—','Son kayıt'],
     ['Sahiplik Mesafesi',ownershipKm()!=null?fmt(ownershipKm(),0)+' km':'—','32.356 km başlangıç'],
@@ -565,8 +611,9 @@ function renderDashboard(){
     ['Şarj Kaydı',c.length,'Toplam oturum'],
     ['DC Enerji Payı',energyTotal?fmt(dcEnergy/energyTotal*100,1)+'%':'—','İstatistik; stres skoru değildir'],
     ['20–80 Bandı',complianceWeighted!==null?fmt(complianceWeighted,1)+'%':'—','Katı hedef değil; koruma bandı'],
-    ['Maks. Ort. C-rate',avgRates.length?fmt(Math.max(...avgRates),2)+'C':'—',avgRates.length?'Enerji + süre hesabı':'Enerji + süre girildiğinde'],
-    ['Maks. Tepe C-rate',peakRates.length?fmt(Math.max(...peakRates),2)+'C':'—','Opsiyonel maksimum güç kaydı']
+    ['En Yüksek Şarj Ortalaması (C-rate)',cRateHistory.maxAverage?fmt(cRateHistory.maxAverage.rate,2)+'C':'—',chargeCRateSessionDetail(cRateHistory.maxAverage)],
+    ['En Yüksek Anlık Şarj Hızı (C-rate)',cRateHistory.maxPeak?fmt(cRateHistory.maxPeak.rate,2)+'C':'—',chargeCRateSessionDetail(cRateHistory.maxPeak,{peak:true})],
+    ['Enerji Ağırlıklı Ortalama C-rate',cRateHistory.weightedAverage!=null?fmt(cRateHistory.weightedAverage,2)+'C':'—',weightedCRateDetail(cRateHistory)]
   ];
   byId('dashboardCards').innerHTML=cards.map(x=>`<div class="metric"><div class="label">${x[0]}</div><div class="value">${x[1]}</div><div class="sub">${x[2]}</div></div>`).join('');
 
@@ -743,7 +790,7 @@ function renderPlanner(){
 
 
 function renderStress(){
-  const c=ownerCharges(),bsi=batteryStressIndex(),r=bsi.recent,l=bsi.lifetime,e=lifetimeExposureMetrics(),exp=e.socTime;
+  const c=ownerCharges(),bsi=batteryStressIndex(),r=bsi.recent,l=bsi.lifetime,e=lifetimeExposureMetrics(),exp=e.socTime,rateSummary=chargeHistoryCRateMetrics(c);
   const cards=[
     ['Son Dönem BSI',r.score!=null?fmt(r.score,1)+'/100':'—',`Son ${bsi.recentCount}/${bsi.window} şarj · düşük daha iyi`],
     ['Cycle / Charge Index',r.cycle?.score!=null?fmt(r.cycle.score,1)+'/100':'—','C-rate + ΔSOC + SOC penceresi'],
@@ -768,7 +815,7 @@ function renderStress(){
 
   byId('stressCoverage').innerHTML=`<div class="mini-list"><div class="mini-item"><span>SOC şarj verisi kapsamı</span><strong>%${fmt(e.coverage.soc,0)}</strong></div><div class="mini-item"><span>C-rate veri kapsamı</span><strong>%${fmt(e.coverage.crate,0)}</strong></div><div class="mini-item"><span>Termal bağlam kapsamı</span><strong>%${fmt(e.coverage.temp,0)}</strong></div><div class="mini-item"><span>SOC×zaman kapsanan süre</span><strong>${fmt(exp.coveredHours,1)} saat</strong></div><div class="mini-item"><span>Toplam güven göstergesi</span><strong><span class="badge ${e.coverage.cls}">${e.coverage.confidence}</span></strong></div></div><p class="muted">Eksik veri kötü kullanım sayılmaz. SOC×zaman entegrasyonunda 72 saatten uzun boşluklar yok sayılır.</p>`;
   renderBarsOrdered('stressSocBands',socBandEnergy(c),' kWh');renderBarsOrdered('stressCRateBands',cRateBandEnergy(c),' kWh');renderBarsOrdered('stressTempBands',tempBandEnergy(c),' kWh');
-  byId('stressThroughput').innerHTML=`<div class="mini-list"><div class="mini-item"><span>Toplam şarj enerjisi</span><strong>${fmt(e.total,1)} kWh</strong></div><div class="mini-item"><span>Şarj tarafı EFC göstergesi</span><strong>${e.chargeEfc!=null?fmt(e.chargeEfc,2):'—'}</strong></div><div class="mini-item"><span>%80–100 bandında eklenen enerji</span><strong>${fmt(e.highSocEnergy,1)} kWh</strong></div><div class="mini-item"><span>%90–100 bandında eklenen enerji</span><strong>${fmt(e.above90Energy,1)} kWh</strong></div><div class="mini-item"><span>Yüksek termal proxy (≥50/100) enerji</span><strong>${fmt(e.thermalHigh,1)} kWh</strong></div><div class="mini-item"><span>Maks. ortalama / tepe C-rate</span><strong>${e.maxAvg!=null?fmt(e.maxAvg,2)+'C':'—'} / ${e.maxPeak!=null?fmt(e.maxPeak,2)+'C':'—'}</strong></div></div>`;
+  byId('stressThroughput').innerHTML=`<div class="mini-list"><div class="mini-item"><span>Toplam şarj enerjisi</span><strong>${fmt(e.total,1)} kWh</strong></div><div class="mini-item"><span>Şarj tarafı EFC göstergesi</span><strong>${e.chargeEfc!=null?fmt(e.chargeEfc,2):'—'}</strong></div><div class="mini-item"><span>%80–100 bandında eklenen enerji</span><strong>${fmt(e.highSocEnergy,1)} kWh</strong></div><div class="mini-item"><span>%90–100 bandında eklenen enerji</span><strong>${fmt(e.above90Energy,1)} kWh</strong></div><div class="mini-item"><span>Yüksek termal proxy (≥50/100) enerji</span><strong>${fmt(e.thermalHigh,1)} kWh</strong></div><div class="mini-item vertical"><strong>En Yüksek Şarj Ortalaması (C-rate): ${rateSummary.maxAverage?fmt(rateSummary.maxAverage.rate,2)+'C':'—'}</strong><span>${chargeCRateSessionDetail(rateSummary.maxAverage)}</span></div><div class="mini-item vertical"><strong>En Yüksek Anlık Şarj Hızı (C-rate): ${rateSummary.maxPeak?fmt(rateSummary.maxPeak.rate,2)+'C':'—'}</strong><span>${chargeCRateSessionDetail(rateSummary.maxPeak,{peak:true})}</span></div><div class="mini-item vertical"><strong>Enerji Ağırlıklı Ortalama C-rate: ${rateSummary.weightedAverage!=null?fmt(rateSummary.weightedAverage,2)+'C':'—'}</strong><span>${weightedCRateDetail(rateSummary)}</span></div></div>`;
 
   byId('socTimeStress').innerHTML=exp.coveredHours?`<div class="mini-list"><div class="mini-item"><span>Kapsanan zaman</span><strong>${fmt(exp.coveredHours,1)} saat</strong></div><div class="mini-item"><span>Ortalama SOC proxy</span><strong>%${fmt(exp.avgSoc,1)}</strong></div><div class="mini-item"><span>>80% SOC</span><strong>${fmt(exp.above80Hours,1)} saat · %${fmt(exp.above80Share,1)}</strong></div><div class="mini-item"><span>>90% SOC</span><strong>${fmt(exp.above90Hours,1)} saat · %${fmt(exp.above90Share,1)}</strong></div><div class="mini-item"><span>Uzun veri boşluğu</span><strong>${fmt(exp.ignoredHours,1)} saat (skorlanmadı)</strong></div></div><p class="muted">SOC noktaları arasında doğrusal değişim varsayılır; bu nedenle laboratuvar coulomb-counting ölçümü değil, calendar-aging için saha proxy'sidir.</p>`:'<div class="empty">Zaman damgalı en az iki SOC noktası gerekir.</div>';
   const snaps=[...(db.socSnapshots||[])].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,8);
@@ -785,9 +832,9 @@ function renderStress(){
 function renderAnalytics(){
   const c=ownerCharges(),t=db.trips,s=db.sohTests,cons=latestConsumptionSnapshot(),cost100=costPer100Metrics(),acd=acDcStats(c),life=lifetimeExposureMetrics();
   const totalCost=sum(c.map(x=>x.cost)),totalEnergy=sum(c.map(chargeEnergyValue)),socKnown=c.filter(hasSocPair),full=socKnown.filter(x=>chargeCompliance(x).full).length;
-  const rates=c.map(chargeCRate).filter(x=>x!=null),avgRates=c.map(chargeAverageCRate).filter(x=>x!=null),peakRates=c.map(chargePeakCRate).filter(x=>x!=null);
-  const cards=[['Sahiplik Mesafesi',ownershipKm()!=null?fmt(ownershipKm(),0)+' km':'—'],['Son Şarjdan Beri',cons?fmt(cons.sinceCharge,1)+' kWh/100 km':'—'],['100 km Tüketim',cost100.consumption!=null?fmt(cost100.consumption,1)+' kWh/100 km':'—'],['100 km Maliyet',cost100.costPer100!=null?fmt(cost100.costPer100,2)+' ₺/100 km':'—'],['Toplam Şarj Enerjisi',fmt(totalEnergy,1)+' kWh'],['Toplam Şarj Maliyeti',fmt(totalCost,0)+' ₺'],['Ort. Enerji Maliyeti',cost100.avgPrice!=null?fmt(cost100.avgPrice,2)+' ₺/kWh':'—'],['DC Enerji Payı',acd.dcShare!=null?fmt(acd.dcShare,1)+'%':'—'],['Tam Koruma Bandı',socKnown.length?fmt(full/socKnown.length*100,0)+'%':'—'],['Ort. Seans C-rate',avgRates.length?fmt(avg(avgRates),2)+'C':rates.length?fmt(avg(rates),2)+'C':'—'],['Maks. Tepe C-rate',peakRates.length?fmt(Math.max(...peakRates),2)+'C':'—']];
-  byId('analyticsCards').innerHTML=cards.map(x=>`<div class="metric"><div class="label">${x[0]}</div><div class="value">${x[1]}</div></div>`).join('');
+  const rateSummary=chargeHistoryCRateMetrics(c);
+  const cards=[['Sahiplik Mesafesi',ownershipKm()!=null?fmt(ownershipKm(),0)+' km':'—'],['Son Şarjdan Beri',cons?fmt(cons.sinceCharge,1)+' kWh/100 km':'—'],['100 km Tüketim',cost100.consumption!=null?fmt(cost100.consumption,1)+' kWh/100 km':'—'],['100 km Maliyet',cost100.costPer100!=null?fmt(cost100.costPer100,2)+' ₺/100 km':'—'],['Toplam Şarj Enerjisi',fmt(totalEnergy,1)+' kWh'],['Toplam Şarj Maliyeti',fmt(totalCost,0)+' ₺'],['Ort. Enerji Maliyeti',cost100.avgPrice!=null?fmt(cost100.avgPrice,2)+' ₺/kWh':'—'],['DC Enerji Payı',acd.dcShare!=null?fmt(acd.dcShare,1)+'%':'—'],['Tam Koruma Bandı',socKnown.length?fmt(full/socKnown.length*100,0)+'%':'—'],['En Yüksek Şarj Ortalaması (C-rate)',rateSummary.maxAverage?fmt(rateSummary.maxAverage.rate,2)+'C':'—',chargeCRateSessionDetail(rateSummary.maxAverage)],['En Yüksek Anlık Şarj Hızı (C-rate)',rateSummary.maxPeak?fmt(rateSummary.maxPeak.rate,2)+'C':'—',chargeCRateSessionDetail(rateSummary.maxPeak,{peak:true})],['Enerji Ağırlıklı Ortalama C-rate',rateSummary.weightedAverage!=null?fmt(rateSummary.weightedAverage,2)+'C':'—',weightedCRateDetail(rateSummary)]];
+  byId('analyticsCards').innerHTML=cards.map(x=>`<div class="metric"><div class="label">${x[0]}</div><div class="value">${x[1]}</div>${x[2]?`<div class="sub">${x[2]}</div>`:''}</div>`).join('');
   renderBars('monthlyConsumption',monthlyAvg(t,'consumption'),' kWh/100');renderBars('monthlyCharging',monthlySum(c,'energy'),' kWh');
   const trend=[...db.consumptionSnapshots].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,12);
   byId('consumptionTrend').innerHTML=trend.length?`<div class="mini-list">${trend.map(x=>`<div class="mini-item"><span>${fmtDate(x.date)} · ${fmt(x.odo,0)} km</span><strong>${fmt(x.sinceCharge,1)} / ${fmt(x.total,1)} kWh/100</strong></div>`).join('')}</div><p class="muted">Gösterim: Son şarjdan beri / sahiplik dönemi toplam ortalama.</p>`:'<div class="empty">Tüketim sayaç kaydı ekleyin.</div>';

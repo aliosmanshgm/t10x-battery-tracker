@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="T10X Batarya" />
   <meta name="mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="manifest.webmanifest" />
-  <title>T10X Batarya & Şarj Takip v0.9.1 · Premium / Apple · Charge Planner</title>
+  <title>T10X Batarya & Şarj Takip v0.9.2 · Premium / Apple · Charge Planner</title>
   <link rel="stylesheet" href="app.css" />
 </head>
 <body>
@@ -481,6 +481,9 @@
             <article class="glossary-item" data-terms="dc direct current doğru akım hızlı şarj"><div class="glossary-term">DC Şarj · Doğru Akım</div><div class="glossary-en">Direct Current Charging</div><p>Harici şarj cihazının AC/DC dönüşümünü yaparak bataryaya doğrudan DC sağlamasıdır. Batarya stresi açısından yalnızca “DC” etiketi değil, gerçek güç/C-rate, SOC ve sıcaklık önemlidir.</p></article>
             <article class="glossary-item" data-terms="c-rate crate c rate şarj oranı"><div class="glossary-term">C-rate · Şarj/Deşarj Oranı</div><div class="glossary-en">C-rate</div><p>Akımın batarya kapasitesine göre normalize edilmiş hızıdır. Paket düzeyinde uygulamada yaklaşık olarak güç (kW) / kapasite (kWh) kullanılır.</p><div class="glossary-example">T10X: 180 kW / 88,5 kWh ≈ 2,03C.</div></article>
             <article class="glossary-item" data-terms="average c-rate ortalama c rate"><div class="glossary-term">Ortalama C-rate</div><div class="glossary-en">Average C-rate</div><p>Bir şarj seansında alınan toplam enerji ve geçen süreden hesaplanan ortalama şarj yüküdür. Seans boyunca gerçek maruziyeti tek bir kısa güç pikinden daha iyi temsil eder.</p></article>
+            <article class="glossary-item" data-terms="en yüksek şarj ortalaması maks ort average maximum oturum"><div class="glossary-term">En Yüksek Şarj Ortalaması (C-rate)</div><div class="glossary-en">Maximum Session-Average C-rate</div><p>Şarj geçmişindeki her oturumun enerji/süre değerinden hesaplanan ortalama C-rate'ler arasında en yüksek olanı gösterir. Tek bir anlık güç piki değildir.</p></article>
+            <article class="glossary-item" data-terms="en yüksek anlık şarj hızı maksimum tepe peak c-rate"><div class="glossary-term">En Yüksek Anlık Şarj Hızı (C-rate)</div><div class="glossary-en">Maximum Recorded Peak C-rate</div><p>Opsiyonel olarak girdiğiniz tepe güçler arasından hesaplanan en yüksek C-rate'tir. Görülmeyen/girilmemiş güçler sıfır veya ortalama güç olarak kabul edilmez.</p></article>
+            <article class="glossary-item" data-terms="enerji ağırlıklı ortalama c-rate weighted mean enerji ile ağırlıklandırılmış"><div class="glossary-term">Enerji Ağırlıklı Ortalama C-rate</div><div class="glossary-en">Energy-Weighted Mean Session C-rate</div><p>Her oturumun ortalama C-rate değeri, o oturumda istasyondan alınan kWh ile ağırlıklandırılır: Σ(kWh × C-rate) / Σ(kWh). Sadece hem enerji hem süre kaydı olan şarjlar kullanılır. Bu bir batarya ömür kaybı yüzdesi değildir.</p><div class="glossary-example">20 kWh × 0,5C ve 40 kWh × 1,5C ise toplam ortalama (20×0,5+40×1,5)/60 ≈ 1,17C.</div></article>
             <article class="glossary-item" data-terms="peak c-rate tepe c rate maximum maksimum güç"><div class="glossary-term">Tepe C-rate</div><div class="glossary-en">Peak C-rate</div><p>Şarj sırasında görülen en yüksek güçten hesaplanan yaklaşık C-rate'tir. Kısa süreli maksimum yükü gösterir; tüm seansın bu hızda gerçekleştiği anlamına gelmez.</p></article>
             <article class="glossary-item" data-terms="delta soc Δsoc soc farkı"><div class="glossary-term">ΔSOC · SOC Değişimi</div><div class="glossary-en">Delta State of Charge</div><p>Başlangıç ve bitiş SOC arasındaki yüzde-puan farkıdır. Şarj derinliği ve sığ/derin çevrim değerlendirmelerinde kullanılır.</p><div class="glossary-example">%35 → %70 şarj = 35 yüzde-puan ΔSOC.</div></article>
           </div>
@@ -628,7 +631,7 @@
     </section>
   </main>
 
-  <footer>v0.9.1 · Premium / Apple · Charge Planner · Engineer Edition · Tek kullanıcı giriş kapısı · Firebase Sync · GitHub Pages · iPhone uyumlu · km/SOC eksik geçmiş kayıt desteği · süre→ortalama güç/C-rate</footer>
+  <footer>v0.9.2 · Premium / Apple · Charge Planner · Engineer Edition · Tek kullanıcı giriş kapısı · Firebase Sync · GitHub Pages · iPhone uyumlu · km/SOC eksik geçmiş kayıt desteği · süre→ortalama güç/C-rate</footer>
   </div>
 
   <script src="weather.js"></script>
