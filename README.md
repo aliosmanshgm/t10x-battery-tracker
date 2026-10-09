@@ -1,4 +1,4 @@
-# T10X Batarya & Şarj Takip v0.9.3 — NMC Decision Support
+# T10X Batarya & Şarj Takip v0.9.4 — NMC Decision Support
 
 Kişisel T10X (88,5 kWh NMC) kullanımı için local-first + Firebase senkronizasyonlu, iPhone/PWA uyumlu batarya ve şarj takip uygulaması.
 
@@ -34,7 +34,7 @@ Ana veri kümeleri:
 - `socSnapshots`
 - `meta`
 
-Şema sürümü: **10**. Eski local veriler otomatik migrate edilir.
+Şema sürümü: **13**. Eski local veriler otomatik migrate edilir.
 
 ## Güvenlik
 
@@ -49,7 +49,7 @@ Repo köküne bu klasörün içindeki dosyaları yükleyin.
 
 Settings > Pages > Deploy from a branch > `main` / `(root)`
 
-Yeni service-worker cache adı `t10x-battery-v0.9.0-planner` olduğundan eski v0.8.x önbellekleri aktivasyon sırasında temizlenir.
+Yeni service-worker cache anahtarı `t10x-battery-v0.9.4-consumption-energy-balance` olarak güncellendi; önceki sürümlerin önbellekleri aktivasyon sırasında temizlenir.
 
 ## Bilimsel sınır
 
@@ -89,3 +89,28 @@ Uygulamadaki CSI, CalSI, BSI ve Batarya Sağlık Skoru üretici BMS algoritması
 ### Test
 
 `node tests/soc-model.test.js` (8 sentetik kontrol). Firebase Authentication / Realtime Database canlı bağlantısı ve iPhone Safari etkileşimi bu testlere dahil değildir.
+
+
+## v0.9.4 - Dashboard tek ekrandan tüketim ve otomatik toplam
+- Dashboard km/SOC hızlı formunda isteğe bağlı **Son şarjdan beri kWh/100 km** alanı.
+- İsteğe bağlı **Bu sürüşün ortalama tüketimi** veri olarak ayrı kalır; son şarjdan beri sayacı ile karıştırılmaz.
+- Toplam/sahiplik dönemi tüketimi elle girilmez. Mesafe ağırlıklı sürüş tüketimlerinden, tüketim yoksa tamamlanmış ve SOC düşüşü doğrulanmış sürüşlerden **yaklaşık** hesaplanır.
+- Veri kapsamı (hesaba katılan km / sahiplik km), ölçülen ve SOC tahminli kilometreler ayrıca gösterilir. Önceki 1.181 km için eksik enerji verisi uydurulmaz.
+- 100 km maliyeti, analizler ve şarj planlayıcısı aynı otomatik hesaplanan tüketim değerine dayanır.
+- Eski manuel toplam tüketim değerleri JSON yedeğinde korunur ancak **artık hesaplamada kullanılmaz**.
+- İkinci bir sürüş kaydı girip kilometreyi çift saymayın. Varsa mükerrer mesafe uyarısı gösterilir.
+- Yeni dosya **consumption-model.js** GitHub köküne konulmalıdır.
+
+
+### v0.9.4 — sahiplik dönemi enerji dengesi seçeneği
+
+Dashboard, son şarjdan beri tüketim ve araç durumunun günlük giriş noktasıdır. Kullanıcı artık sahiplik dönemi toplam tüketimini elle giremez.
+
+Toplam sahiplik tüketimi iki ayrı kanıt seviyesinde hesaplanır:
+
+1. **Eksik şarj defteri veya doğrulanmamış bütünlük:** Sadece kaydedilmiş sürüş mesafelerinin mesafe-ağırlıklı ortalaması gösterilir. Bu, bütün sahiplik döneminin ölçülmüş ortalaması olarak sunulmaz. Kapsanan km payı görünür.
+2. **Bütün şarjlar kayıtlı olarak açık onay verildiyse:** İstasyon kWh verisine tahmini AC/DC şarj verimi uygulanır, sahiplik başlangıç/güncel SOC farkı ile enerji dengesi kurulur, toplam sahiplik kilometresine bölünür. Sonuç kesin ölçüm değil, **yaklaşık toplam enerji tüketimi** olarak etiketlenir.
+
+Formül: `E_tüketim ≈ Σ(E_AC × η_AC) + Σ(E_DC × η_DC) + (SOC_ilk − SOC_son) × E_kullanılabilir / 100`. Ardından `kWh/100km = E_tüketim × 100 / toplam kilometre`. Varsayılan η_AC=%90, η_DC=%96; bunlar T10X’e özel laboratuvarla doğrulanmış değerler değil, değiştirilebilir mühendislik varsayımlarıdır. 88,5 kWh nominal referanstır; gerçek kullanılabilir kapasite farklı olabilir.
+
+Eksik kWh, tutarsız enerji dengesi veya başlangıç/güncel SOC/odometre yoksa sahte bir toplam sunulmaz. Eski manuel `total` değerleri korunur ancak hesaplamalarda kullanılmaz.

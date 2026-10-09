@@ -1,4 +1,4 @@
-# Firebase + GitHub Pages Kurulum Kontrol Listesi — v0.9.3
+# Firebase + GitHub Pages Kurulum Kontrol Listesi — v0.9.4
 
 ## 1. Tamamlananlar
 - Firebase projesi: `t10x-battery-tracker`
@@ -54,7 +54,7 @@ Senkronizasyon doğrulandıktan sonra Safari Paylaş > Ana Ekrana Ekle ile PWA g
 ## 9. Veri güvenliği
 Firebase web config istemci tarafında görünür. Gerçek erişim kontrolü Authentication + Realtime Database Security Rules ile sağlanır.
 
-## Tek kullanıcı modu (v0.9.3)
+## Tek kullanıcı modu (v0.9.4)
 
 Bu sürümde uygulama giriş yapılmadan açılmaz ve web arayüzünde **Hesap Oluştur** seçeneği yoktur.
 
@@ -66,10 +66,10 @@ Bu sürümde uygulama giriş yapılmadan açılmaz ve web arayüzünde **Hesap O
 
 Bu kural, veritabanını yalnızca o UID'ye kilitler. Başka bir Firebase hesabı oluşturulsa dahi T10X veritabanını okuyamaz veya yazamaz.
 
-GitHub'a v0.9.3 dosyalarını yükledikten sonra önceki service worker önbelleği nedeniyle eski ekranı görürseniz sayfayı yenileyin. Ana ekrana eklenmiş iPhone sürümünde uygulamayı tamamen kapatıp yeniden açmak da yeni service worker'ın devreye girmesini hızlandırır.
+GitHub'a v0.9.4 dosyalarını yükledikten sonra önceki service worker önbelleği nedeniyle eski ekranı görürseniz sayfayı yenileyin. Ana ekrana eklenmiş iPhone sürümünde uygulamayı tamamen kapatıp yeniden açmak da yeni service worker'ın devreye girmesini hızlandırır.
 
 
-## v0.9.3 ek notlar
+## v0.9.4 ek notlar
 - `weather.js` GitHub Pages üzerinde otomatik hava sorgusu için gereklidir; repo kökünde tutulmalıdır.
 - Konum izni yalnızca HTTPS/GitHub Pages (ve localhost geliştirme ortamı) üzerinde çalışır.
 - Uygulama konum koordinatlarını Firebase veri modeline yazmaz.
@@ -77,4 +77,22 @@ GitHub'a v0.9.3 dosyalarını yükledikten sonra önceki service worker önbelle
 - Eski v0.8 verileri uygulama tarafından şema 10'a migrate edilir. JSON yedeğini yine de koruyun.
 
 
-**v0.9.3:** GitHub Pages kök klasörüne `soc-model.js` dosyasını da koyun. Firebase kuralları değişmez. İlk açılışta v11 veri modeli local v10 ve bulut v10 ile uyumludur.
+**v0.9.4:** GitHub Pages kök klasörüne `soc-model.js` ve yeni `consumption-model.js` dosyalarını koyun. Firebase kuralları değişmez. v12 veri modeli local/bulut v11 verilerini okuyabilir.
+
+
+## v0.9.4 sürüm geçişi
+
+1. Önce Dashboard > JSON Yedekle ile yedek alın.
+2. ZIP içindeki **tüm** dosyaları (özellikle `consumption-model.js`, `app.js`, `index.html`, `app.css`, `sw.js`) mevcut GitHub Pages deposunun kök dizinine yerleştirin.
+3. Mobil Safari sayfasını yenileyin; eski görünüm sürerse ana ekran uygulamasını kapatıp yeniden açın.
+4. Dashboard > Güncel Araç Durumu formundan kilometre, SOC ve dilerseniz “Son şarjdan beri” tüketimini kaydedin.
+5. Toplam sahiplik tüketimi manuel değildir. Yalnızca tüketimi bilinen sürüş km'leri ve uygun SOC tahmini bulunan tamamlanmış sürüşler kapsanır; önceki 1.181 km için otomatik enerji uydurulmaz.
+6. Firebase Authentication veya Database Rules üzerinde değişiklik gerekmez.
+
+
+## v0.9.4 — Dashboard tüketim değişikliği
+
+- GitHub Pages kök klasörüne yeni `consumption-model.js` dosyasını da yükleyin. `index.html`, `app.js`, `app.css`, `sw.js` ve `README.md` dosyalarını güncelleyin.
+- Firebase Security Rules veya kimlik doğrulama ayarları **değişmedi**. Yeni ayarlar aynı `users/<uid>/appData.settings` altında saklanır; şema v13'e yükselir ve eski kayıtlar korunur.
+- Önce JSON yedeği alın. iPhone Safari'de önbelleğe takılırsa sayfayı tamamen yeniden yükleyin veya kurulu ana ekran kısayolunu kapatıp açın.
+- Dashboard'daki “Şarjlarım eksiksiz” kutusunu yalnızca sahiplik başlangıcından bugüne tüm şarjların kWh değerlerini girdiyseniz işaretleyin. Hesap yaklaşık enerji dengesi tahminidir; üretici BMS verisinin yerine geçmez.
