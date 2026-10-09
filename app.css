@@ -407,3 +407,16 @@ input[type="time"]::-webkit-datetime-edit{
 .metric .sub{overflow-wrap:anywhere;line-height:1.45} 
 #dashboardCards .metric,#analyticsCards .metric{min-width:0}
 @media(max-width:700px){#dashboardCards .metric .sub,#analyticsCards .metric .sub{font-size:11px}}
+
+/* v0.9.3: compact one-tap drive/park tracking, iOS-safe layout */
+.drive-quick-form{grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:12px}
+.drive-quick-form>*{min-width:0}
+.drive-quick-form input{min-width:0;max-width:100%;width:100%;box-sizing:border-box}
+.drive-optional,.drive-actions,.drive-status-info,.drive-help{grid-column:1/-1}
+.drive-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.drive-actions button{min-width:0;white-space:normal;line-height:1.3}
+.drive-actions button:last-child{grid-column:1/-1}
+.drive-status-info{margin:1px 0 0;padding:12px 14px;line-height:1.5;border-radius:15px;background:rgba(49,120,255,.08);font-size:13px;color:#344054}
+.drive-help{line-height:1.5;margin:0}
+@media(max-width:700px){.drive-quick-form{grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important}.drive-actions button{font-size:13px;min-height:48px}.drive-optional input{font-size:16px}}
+@media(max-width:390px){.drive-actions{grid-template-columns:1fr}.drive-actions button:last-child{grid-column:auto}}

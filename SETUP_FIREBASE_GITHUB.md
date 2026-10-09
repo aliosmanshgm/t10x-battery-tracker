@@ -1,4 +1,4 @@
-# Firebase + GitHub Pages Kurulum Kontrol Listesi — v0.9.2
+# Firebase + GitHub Pages Kurulum Kontrol Listesi — v0.9.3
 
 ## 1. Tamamlananlar
 - Firebase projesi: `t10x-battery-tracker`
@@ -54,7 +54,7 @@ Senkronizasyon doğrulandıktan sonra Safari Paylaş > Ana Ekrana Ekle ile PWA g
 ## 9. Veri güvenliği
 Firebase web config istemci tarafında görünür. Gerçek erişim kontrolü Authentication + Realtime Database Security Rules ile sağlanır.
 
-## Tek kullanıcı modu (v0.9.2)
+## Tek kullanıcı modu (v0.9.3)
 
 Bu sürümde uygulama giriş yapılmadan açılmaz ve web arayüzünde **Hesap Oluştur** seçeneği yoktur.
 
@@ -66,12 +66,15 @@ Bu sürümde uygulama giriş yapılmadan açılmaz ve web arayüzünde **Hesap O
 
 Bu kural, veritabanını yalnızca o UID'ye kilitler. Başka bir Firebase hesabı oluşturulsa dahi T10X veritabanını okuyamaz veya yazamaz.
 
-GitHub'a v0.9.2 dosyalarını yükledikten sonra önceki service worker önbelleği nedeniyle eski ekranı görürseniz sayfayı yenileyin. Ana ekrana eklenmiş iPhone sürümünde uygulamayı tamamen kapatıp yeniden açmak da yeni service worker'ın devreye girmesini hızlandırır.
+GitHub'a v0.9.3 dosyalarını yükledikten sonra önceki service worker önbelleği nedeniyle eski ekranı görürseniz sayfayı yenileyin. Ana ekrana eklenmiş iPhone sürümünde uygulamayı tamamen kapatıp yeniden açmak da yeni service worker'ın devreye girmesini hızlandırır.
 
 
-## v0.9.2 ek notlar
+## v0.9.3 ek notlar
 - `weather.js` GitHub Pages üzerinde otomatik hava sorgusu için gereklidir; repo kökünde tutulmalıdır.
 - Konum izni yalnızca HTTPS/GitHub Pages (ve localhost geliştirme ortamı) üzerinde çalışır.
 - Uygulama konum koordinatlarını Firebase veri modeline yazmaz.
 - MGM resmi sayfası referans bağlantısıdır; tarayıcıdan otomatik sıcaklık için Open-Meteo kullanılır.
 - Eski v0.8 verileri uygulama tarafından şema 10'a migrate edilir. JSON yedeğini yine de koruyun.
+
+
+**v0.9.3:** GitHub Pages kök klasörüne `soc-model.js` dosyasını da koyun. Firebase kuralları değişmez. İlk açılışta v11 veri modeli local v10 ve bulut v10 ile uyumludur.

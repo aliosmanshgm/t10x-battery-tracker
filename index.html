@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="T10X Batarya" />
   <meta name="mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="manifest.webmanifest" />
-  <title>T10X Batarya & Şarj Takip v0.9.2 · Premium / Apple · Charge Planner</title>
+  <title>T10X Batarya & Şarj Takip v0.9.3 · Premium / Apple · Charge Planner</title>
   <link rel="stylesheet" href="app.css" />
 </head>
 <body>
@@ -100,10 +100,17 @@
         </article>
         <article class="card">
           <div class="card-head"><h2>Güncel Araç Durumu</h2></div>
-          <form id="quickStatusForm" class="quick-status-form">
-            <label>Kilometre<input id="quickCurrentOdo" type="number" min="0" step="1"></label>
-            <label>SOC (%)<input id="quickCurrentSoc" type="number" min="0" max="100" step="1"></label>
-            <button type="submit">Durumu Güncelle</button>
+          <form id="quickStatusForm" class="quick-status-form drive-quick-form">
+            <label>Kilometre<input id="quickCurrentOdo" type="number" min="0" step="1" inputmode="numeric" required></label>
+            <label>SOC (%)<input id="quickCurrentSoc" type="number" min="0" max="100" step="1" inputmode="numeric" required></label>
+            <label class="drive-optional">Bu sürüş ort. tüketimi (kWh/100 km) · isteğe bağlı<input id="quickDriveConsumption" type="number" min="0" max="100" step="0.1" inputmode="decimal" placeholder="Örn. 18,2 (sürüş bitişinde)"></label>
+            <div class="drive-actions">
+              <button type="button" class="secondary" id="quickDriveStartBtn">Sürüşe Başla</button>
+              <button type="button" id="quickDriveEndBtn">Sürüşü Bitirdim</button>
+              <button type="submit" class="secondary">Yalnızca Durumu Güncelle</button>
+            </div>
+            <p id="driveStatusInfo" class="drive-status-info" aria-live="polite"></p>
+            <p class="muted drive-help">Önerilen kullanım: Sürüşe başlarken bir kez <strong>Başla</strong>, park ettiğinizde <strong>Bitirdim</strong>. Yalnızca gün sonu kayıtları da kabul edilir; eksik aralıklar stres hesabına kesin bilgi gibi katılmaz.</p>
           </form>
         </article>
       </div>
@@ -337,11 +344,15 @@
       </div>
       <div class="grid two">
         <article class="card"><h2>SOC × Zaman Özeti</h2><div id="socTimeStress"></div></article>
-        <article class="card"><h2>Manuel SOC Günlüğü</h2><div id="socSnapshotList"></div><p class="muted">Dashboard’daki “Güncel Araç Durumu” her güncellendiğinde zaman damgalı bir SOC noktası ekler. Şarj başlangıç/bitiş SOC’leri ayrıca otomatik zaman çizgisine katılır.</p></article>
+        <article class="card"><h2>SOC Olay Günlüğü</h2><div id="socSnapshotList"></div><p class="muted">Sürüş başlangıcı/bitişi ve manuel araç durumu ayrı olay türleri olarak tutulur. Şarj kayıtları da zaman çizelgesine eklenir. Eski manuel veriler silinmez.</p></article>
+      </div>
+      <div class="grid two">
+        <article class="card"><div class="card-head"><h2>Sürüş / Park Kayıtları</h2><button id="exportDriveSessionsCsv" class="link-btn" type="button">CSV</button></div><div id="driveSessionList"></div><p class="muted">Başlangıç ve bitiş birlikte girilmişse mesafe ve süre yorumlanır. Başlangıcı olmayan kayıtlarda sadece bitiş ve park başlangıcı bilinir.</p></article>
+        <article class="card"><h2>SOC Zaman Modeli: Veri Güveni</h2><p>İki nokta arasında artık otomatik doğrusal deşarj varsayılmaz. Aynı kilometrede, SOC değişimi küçük olan ve süresi 72 saati aşmayan gözlemler park olarak kabul edilir. Sürüş/şarj ayrı tutulur; belirsiz aralıklar CalSI'ye dahil edilmez. Bu kural bir <strong>gözlem modeli</strong> olup üreticinin BMS verisi değildir.</p></article>
       </div>
       <div class="grid two">
         <article class="card"><h2>Teknik Yorum</h2><div id="stressInterpretation"></div></article>
-        <article class="card"><h2>İndeks Formülü</h2><div class="mini-list"><div class="mini-item vertical"><strong>CSI · C-rate</strong><span>Ortalama C-rate esas alınır; düşük güçlü DC ile yüksek güçlü DC aynı sınıfa konmaz.</span></div><div class="mini-item vertical"><strong>CSI · Şarj derinliği / ΔSOC</strong><span>Sığ şarj çevrimleri, aynı yüksek-SOC bölgede kalmadıkları sürece daha düşük çevrim stresi göstergesi (cycle-stress proxy) üretir.</span></div><div class="mini-item vertical"><strong>CSI · SOC penceresi</strong><span>%80–90 orta, %90–100 daha yüksek ağırlık; %20 altı yalnızca küçük ağırlık alır.</span></div><div class="mini-item vertical"><strong>CalSI · SOC×zaman</strong><span>Ortalama SOC, >%80 saat ve >%90 saat piecewise-linear zaman integraliyle tahmin edilir.</span></div><div class="mini-item vertical"><strong>CalSI · Termal bağlam</strong><span>Gerçek batarya sıcaklığı varsa doğrudan; yoksa ortam + park + ön sürüş nitel termal gösterge (proxy) olarak kullanılır.</span></div></div><p class="muted">AC/DC oranı artık BSI bileşeni değildir. EFC ve toplam enerji geçişi (throughput) kümülatif maruziyet olarak ayrıca raporlanır.</p></article>
+        <article class="card"><h2>İndeks Formülü</h2><div class="mini-list"><div class="mini-item vertical"><strong>CSI · C-rate</strong><span>Ortalama C-rate esas alınır; düşük güçlü DC ile yüksek güçlü DC aynı sınıfa konmaz.</span></div><div class="mini-item vertical"><strong>CSI · Şarj derinliği / ΔSOC</strong><span>Sığ şarj çevrimleri, aynı yüksek-SOC bölgede kalmadıkları sürece daha düşük çevrim stresi göstergesi (cycle-stress proxy) üretir.</span></div><div class="mini-item vertical"><strong>CSI · SOC penceresi</strong><span>%80–90 orta, %90–100 daha yüksek ağırlık; %20 altı yalnızca küçük ağırlık alır.</span></div><div class="mini-item vertical"><strong>CalSI · SOC×zaman</strong><span>Yalnızca kayda dayalı park aralıklarında ortalama SOC, >%80 ve >%90 bekleme saatleri yaklaşık hesaplanır; sürüş/şarj/eksik zaman ayrılır.</span></div><div class="mini-item vertical"><strong>CalSI · Termal bağlam</strong><span>Gerçek batarya sıcaklığı varsa doğrudan; yoksa ortam + park + ön sürüş nitel termal gösterge (proxy) olarak kullanılır.</span></div></div><p class="muted">AC/DC oranı artık BSI bileşeni değildir. EFC ve toplam enerji geçişi (throughput) kümülatif maruziyet olarak ayrıca raporlanır.</p></article>
       </div>
     </section>
 
@@ -631,10 +642,11 @@
     </section>
   </main>
 
-  <footer>v0.9.2 · Premium / Apple · Charge Planner · Engineer Edition · Tek kullanıcı giriş kapısı · Firebase Sync · GitHub Pages · iPhone uyumlu · km/SOC eksik geçmiş kayıt desteği · süre→ortalama güç/C-rate</footer>
+  <footer>v0.9.3 · Premium / Apple · Charge Planner · Engineer Edition · Tek kullanıcı giriş kapısı · Firebase Sync · GitHub Pages · iPhone uyumlu · km/SOC eksik geçmiş kayıt desteği · süre→ortalama güç/C-rate</footer>
   </div>
 
   <script src="weather.js"></script>
+  <script src="soc-model.js"></script>
   <script src="app.js"></script>
   <script type="module" src="firebase-sync.js"></script>
   <script>

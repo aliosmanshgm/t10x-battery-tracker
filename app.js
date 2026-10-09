@@ -1,5 +1,5 @@
-const STORAGE_KEY='t10xBatteryTracker_v10';
-const LEGACY_KEYS=['t10xBatteryTracker_v9','t10xBatteryTracker_v8','t10xBatteryTracker_v6','t10xBatteryTracker_v5','t10xBatteryTracker_v4','t10xBatteryTracker_v3','t10xBatteryTracker_v2','t10xBatteryTracker_v1'];
+const STORAGE_KEY='t10xBatteryTracker_v11';
+const LEGACY_KEYS=['t10xBatteryTracker_v10','t10xBatteryTracker_v9','t10xBatteryTracker_v8','t10xBatteryTracker_v6','t10xBatteryTracker_v5','t10xBatteryTracker_v4','t10xBatteryTracker_v3','t10xBatteryTracker_v2','t10xBatteryTracker_v1'];
 const DEFAULT_PROVIDERS=[
   "ZES Şarj",
   "Trugo Şarj",
@@ -163,14 +163,14 @@ const DEFAULT_PROVIDERS=[
   "Ev / Kendi AC Şarjım"
 ];
 const defaults={
-  meta:{schemaVersion:10,updatedAt:''},
+  meta:{schemaVersion:11,updatedAt:''},
   settings:{
     vehicleName:'T10X Uzun Menzil',batteryChemistry:'NMC',ownershipStartOdo:32356,ownershipStartSoc:59,ownershipStartDate:'',trackingStartOdo:33537,currentOdo:33537,currentSoc:76,
     referenceCapacity:88.5,preferredMinSoc:20,preferredMaxSoc:80,
     stressWindow:12,plannerReserveSoc:15,plannerMarginPct:10,mgmCity:'ANKARA',currentSocUpdatedAt:''
   },
   providers:[...DEFAULT_PROVIDERS],
-  charges:[],trips:[],consumptionSnapshots:[],sohTests:[],socSnapshots:[]
+  charges:[],trips:[],consumptionSnapshots:[],sohTests:[],socSnapshots:[],driveSessions:[],activeDrive:null
 };
 
 let db=load();
@@ -183,14 +183,14 @@ const domIds=[
   'plannerForm','plannerCurrentSoc','plannerDistance','plannerConsumption','plannerReserveSoc','plannerMargin','plannerDeparture','plannerChargeType','plannerPower','plannerAmbientTemp','plannerParking','plannerParkHours','plannerPreDriveMin','plannerWeatherBtn','plannerWeatherStatus','plannerResult','plannerBadge','plannerThermal','plannerWeatherDetail','plannerMgmLink',
   'crateForm','crateCapacity','cratePower','crateStartSoc','crateEndSoc','crateTemp',
   'settingsForm','vehicleName','batteryChemistry','ownershipStartOdo','ownershipStartSoc','ownershipStartDate','trackingStartOdo','currentOdo','currentSoc','referenceCapacity','preferredMinSoc','preferredMaxSoc','stressWindow','plannerReserveDefault','plannerMarginDefault','mgmCity','clearAllBtn',
-  'quickStatusForm','quickCurrentOdo','quickCurrentSoc','providerNew','providerAddBtn','providerResetBtn','providerManager',
-  'exportJsonBtn','importJsonInput','exportChargesCsv','exportConsumptionCsv','exportTripsCsv'
+  'quickStatusForm','quickCurrentOdo','quickCurrentSoc','quickDriveConsumption','quickDriveStartBtn','quickDriveEndBtn','driveStatusInfo','providerNew','providerAddBtn','providerResetBtn','providerManager',
+  'exportJsonBtn','importJsonInput','exportChargesCsv','exportConsumptionCsv','exportTripsCsv','exportDriveSessionsCsv'
 ];
 const D=Object.fromEntries(domIds.map(id=>[id,byId(id)]));
 
 function migrate(obj){
   const out={...structuredClone(defaults),...(obj||{})};
-  out.meta={...structuredClone(defaults.meta),...(obj?.meta||{}),schemaVersion:10};
+  out.meta={...structuredClone(defaults.meta),...(obj?.meta||{}),schemaVersion:11};
   out.settings={...structuredClone(defaults.settings),...(obj?.settings||{})};
   delete out.settings.targetDcShare;delete out.settings.balanceWindow;
   if(obj?.settings&&obj.settings.ownershipStartSoc==null){
@@ -204,6 +204,8 @@ function migrate(obj){
   out.providers=Array.isArray(obj?.providers)&&obj.providers.length?[...new Set(obj.providers.filter(Boolean))]:[...DEFAULT_PROVIDERS];
   out.sohTests=Array.isArray(obj?.sohTests)?obj.sohTests:[];
   out.socSnapshots=Array.isArray(obj?.socSnapshots)?obj.socSnapshots:[];
+  out.driveSessions=Array.isArray(obj?.driveSessions)?obj.driveSessions:[];
+  out.activeDrive=(obj?.activeDrive&&Number.isFinite(new Date(obj.activeDrive.startAt).getTime()))?obj.activeDrive:null;
   return out;
 }
 function load(){
@@ -214,14 +216,14 @@ function load(){
   }catch{return structuredClone(defaults)}
 }
 function persistLocal({emit=false}={}){localStorage.setItem(STORAGE_KEY,JSON.stringify(db));renderAll();if(emit)window.dispatchEvent(new CustomEvent('t10x:data-changed',{detail:{db:structuredClone(db)}}));}
-function save(){db.meta={...(db.meta||{}),schemaVersion:10,updatedAt:new Date().toISOString()};persistLocal({emit:true})}
+function save(){db.meta={...(db.meta||{}),schemaVersion:11,updatedAt:new Date().toISOString()};persistLocal({emit:true})}
 
 window.T10XApp={
   getData:()=>structuredClone(db),
   replaceData:(next,{emit=false}={})=>{db=migrate(next||{});persistLocal({emit});return structuredClone(db)},
-  hasMeaningfulData:()=>Boolean(db.charges.length||db.trips.length||db.consumptionSnapshots.length||db.sohTests.length||db.socSnapshots.length||db.meta?.updatedAt),
+  hasMeaningfulData:()=>Boolean(db.charges.length||db.trips.length||db.consumptionSnapshots.length||db.sohTests.length||db.socSnapshots.length||db.driveSessions.length||!!db.activeDrive||db.meta?.updatedAt),
   storageKey:STORAGE_KEY,
-  schemaVersion:10
+  schemaVersion:11
 };
 
 function uid(){return crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random())}
@@ -490,35 +492,10 @@ function chargeEndMs(c){
   return start+Math.max(1,Number(c.durationMin)||1)*60000;
 }
 function socTimelinePoints(){
-  const pts=[];
-  if(db.settings.ownershipStartDate&&Number.isFinite(Number(db.settings.ownershipStartSoc))){const t=new Date(db.settings.ownershipStartDate+'T12:00:00').getTime();if(Number.isFinite(t))pts.push({t,soc:Number(db.settings.ownershipStartSoc),source:'Sahiplik başlangıcı'});}
-  for(const c of ownerCharges()){
-    if(!hasSocPair(c)||!c.date)continue;const t0=new Date(c.date).getTime();if(!Number.isFinite(t0))continue;
-    pts.push({t:t0,soc:Number(c.startSoc),source:'Şarj başlangıcı'});const t1=chargeEndMs(c);if(t1!=null)pts.push({t:t1,soc:Number(c.endSoc),source:'Şarj bitişi'});
-  }
-  for(const x of db.socSnapshots||[]){const t=new Date(x.date||'').getTime();if(Number.isFinite(t)&&Number.isFinite(Number(x.soc)))pts.push({t,soc:Number(x.soc),source:x.sourceLabel||'Manuel durum',id:x.id,manual:true});}
-  if(db.settings.currentSocUpdatedAt&&Number.isFinite(Number(db.settings.currentSoc))){const t=new Date(db.settings.currentSocUpdatedAt).getTime();if(Number.isFinite(t))pts.push({t,soc:Number(db.settings.currentSoc),source:'Güncel durum'});}
-  pts.sort((a,b)=>a.t-b.t);
-  const dedup=[];for(const p of pts){if(dedup.length&&Math.abs(dedup[dedup.length-1].t-p.t)<1000)dedup[dedup.length-1]=p;else dedup.push(p);}return dedup;
-}
-function linearHoursAbove(s0,s1,threshold,hours){
-  if(hours<=0)return 0;if(s0>threshold&&s1>threshold)return hours;if(s0<=threshold&&s1<=threshold)return 0;if(s0===s1)return s0>threshold?hours:0;
-  if(s0>threshold)return hours*clamp((s0-threshold)/(s0-s1),0,1);
-  return hours*clamp((s1-threshold)/(s1-s0),0,1);
+  return window.T10XSocModel.eventList({...db,charges:ownerCharges()}).map(x=>({...x,source:x.kind,id:x.id}));
 }
 function socExposureMetrics(maxGapHours=72,startMs=null,endMs=null){
-  const pts=socTimelinePoints();let coveredHours=0,weightedSocHours=0,above80Hours=0,above90Hours=0,ignoredHours=0;
-  const lo=Number.isFinite(startMs)?startMs:-Infinity,hi=Number.isFinite(endMs)?endMs:Infinity;
-  for(let i=1;i<pts.length;i++){
-    const a=pts[i-1],b=pts[i],fullHours=(b.t-a.t)/3600000;if(!(fullHours>0))continue;
-    if(fullHours>maxGapHours){if(b.t>lo&&a.t<hi)ignoredHours+=Math.max(0,Math.min(b.t,hi)-Math.max(a.t,lo))/3600000;continue;}
-    const t0=Math.max(a.t,lo),t1=Math.min(b.t,hi);if(!(t1>t0))continue;
-    const f0=(t0-a.t)/(b.t-a.t),f1=(t1-a.t)/(b.t-a.t),s0=a.soc+(b.soc-a.soc)*f0,s1=a.soc+(b.soc-a.soc)*f1,h=(t1-t0)/3600000;
-    coveredHours+=h;weightedSocHours+=h*(s0+s1)/2;above80Hours+=linearHoursAbove(s0,s1,80,h);above90Hours+=linearHoursAbove(s0,s1,90,h);
-  }
-  const avgSoc=coveredHours?weightedSocHours/coveredHours:null,above80Share=coveredHours?above80Hours/coveredHours*100:null,above90Share=coveredHours?above90Hours/coveredHours*100:null;
-  const confidence=coveredHours>=72?'Yüksek':coveredHours>=12?'Orta':'Düşük',cls=coveredHours>=72?'good':coveredHours>=12?'info':'warn';
-  return{points:pts,coveredHours,ignoredHours,avgSoc,above80Hours,above90Hours,above80Share,above90Share,confidence,cls,maxGapHours,startMs:Number.isFinite(startMs)?startMs:null,endMs:Number.isFinite(endMs)?endMs:null};
+  return window.T10XSocModel.exposure({...db,charges:ownerCharges()},{maxGapHours,startMs,endMs});
 }
 function socTimeStressValue(exp=socExposureMetrics()){
   if(!(exp.coveredHours>0))return null;
@@ -529,7 +506,7 @@ function calendarStressIndex(charges=ownerCharges()){
   const starts=charges.map(x=>new Date(x.date||'').getTime()).filter(Number.isFinite),startMs=starts.length?Math.min(...starts):null;
   const timeline=socTimelinePoints(),timelineEnd=timeline.length?timeline[timeline.length-1].t:null;
   const exp=socExposureMetrics(72,startMs,timelineEnd),components=[];
-  if(exp.coveredHours>=3){const s=socTimeStressValue(exp);components.push({key:'socTime',label:'SOC × zaman',score:s,weight:70,detail:`Ort. SOC %${fmt(exp.avgSoc,1)} · >80% ${fmt(exp.above80Hours,1)} saat · >90% ${fmt(exp.above90Hours,1)} saat`});}
+  if(exp.coveredHours>=3){const s=socTimeStressValue(exp);components.push({key:'socTime',label:'SOC × zaman',score:s,weight:70,detail:`Kayda dayalı park ort. SOC %${fmt(exp.avgSoc,1)} · >80% ${fmt(exp.above80Hours,1)} saat · >90% ${fmt(exp.above90Hours,1)} saat`});}
   else{const hs=weightedStressMean(charges,chargeSocStress);if(hs!=null)components.push({key:'socProxy',label:'Yüksek-SOC proxy',score:hs,weight:60,detail:'SOC×zaman verisi yetersiz; şarj penceresi proxy olarak kullanıldı.'});}
   const th=weightedStressMean(charges,thermalStressValue);if(th!=null)components.push({key:'thermal',label:'Termal bağlam',score:th,weight:30,detail:'Gerçek batarya sıcaklığı varsa öncelikli; aksi halde ambient/park/ön sürüş proxy.'});
   const w=sum(components.map(x=>x.weight)),score=w?sum(components.map(x=>x.score*x.weight))/w:null;
@@ -636,7 +613,14 @@ function renderDashboard(){
   byId('ownershipSummary').innerHTML=`<div class="mini-list"><div class="mini-item"><span>Sahiplik başlangıcı</span><strong>${db.settings.ownershipStartOdo?fmt(db.settings.ownershipStartOdo,0)+' km':'-'} · %${db.settings.ownershipStartSoc??'-'}${db.settings.ownershipStartDate?' · '+fmtDate(db.settings.ownershipStartDate):''}</strong></div><div class="mini-item"><span>Güncel durum</span><strong>${latestOdo()?fmt(latestOdo(),0)+' km':'-'} · %${db.settings.currentSoc??'-'}</strong></div><div class="mini-item"><span>Sizin dönemde izlenen mesafe</span><strong>${ownKm!=null?fmt(ownKm,0)+' km':'-'}</strong></div><div class="mini-item"><span>Sizin şarj kayıtlarınız</span><strong>${c.length}</strong></div><div class="mini-item"><span>Sonradan girilen geçmiş kayıt</span><strong>${ownerHistory}</strong></div>${prev?`<div class="mini-item"><span>Önceki sahip kaydı</span><strong>${prev}</strong></div>`:''}</div>`;
   const detailedAvg=weightedTripConsumption();
   byId('consumptionSummary').innerHTML=cons?`<div class="consumption-pair"><div><span>Son şarjdan beri</span><strong>${fmt(cons.sinceCharge,1)}</strong><small>kWh/100 km</small></div><div><span>Toplam</span><strong>${fmt(cons.total,1)}</strong><small>kWh/100 km</small></div></div><p class="muted">Son sayaç kaydı: ${fmtDate(cons.date)} · ${fmt(cons.odo,0)} km${detailedAvg!=null?` · Ayrıntılı sürüşlerden ağırlıklı ortalama: ${fmt(detailedAvg,1)} kWh/100 km`:''}</p>`:'<div class="empty">Henüz tüketim sayaç kaydı yok. Araç ekranındaki iki ortalamayı Tüketim / Sürüş bölümünden ekleyin.</div>';
-  D.quickCurrentOdo.value=db.settings.currentOdo??latestOdo()??'';D.quickCurrentSoc.value=db.settings.currentSoc??'';
+  if(document.activeElement!==D.quickCurrentOdo)D.quickCurrentOdo.value=db.settings.currentOdo??latestOdo()??'';
+  if(document.activeElement!==D.quickCurrentSoc)D.quickCurrentSoc.value=db.settings.currentSoc??'';
+  const ad=db.activeDrive;
+  byId('driveStatusInfo').innerHTML=ad
+    ?`<strong>Sürüş devam ediyor.</strong> Başlangıç: ${fmtDate(ad.startAt)} · ${fmt(ad.startOdo,0)} km · %${fmt(ad.startSoc,0)} SOC. Bitirirken güncel km/SOC girin.`
+    :'Sürüş başlamadı. İsterseniz sadece <strong>“Sürüşü Bitirdim”</strong> ile park başlangıcını işaretleyebilirsiniz; başlangıç bilinmiyorsa yolculuk süresi hesaplanmaz.';
+  D.quickDriveStartBtn.disabled=!!ad;
+  D.quickDriveEndBtn.textContent=ad?'Sürüşü Bitirdim':'Sürüşü Bitirdim (başlangıç yok)';
 
   const rec=recommendation();byId('smartRecommendation').innerHTML=`<p>${rec.html}</p><p class="muted">Karar motoru: C-rate + SOC penceresi + SOC×zaman + termal bağlam. AC/DC etiketi tek başına sağlık kararı üretmez.</p>`;byId('recommendationBadge').textContent=rec.title;byId('recommendationBadge').className=`badge ${rec.level}`;
   const recent=[...c].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,5);
@@ -645,7 +629,7 @@ function renderDashboard(){
   byId('complianceSummary').innerHTML=c.length?`<div class="mini-list"><div class="mini-item"><span>SOC verisi olan oturum</span><strong>${socKnown.length}/${c.length}</strong></div><div class="mini-item"><span>Tam koruma bandında kalan</span><strong>${socKnown.length?`${full}/${socKnown.length} (${fmt(full/socKnown.length*100,0)}%)`:'—'}</strong></div><div class="mini-item"><span>%80 üstüne çıkan</span><strong>${socKnown.length?above:'—'}</strong></div><div class="mini-item"><span>%20 altından başlayan</span><strong>${socKnown.length?below:'—'}</strong></div><p class="muted">%20’ye düşmeyi beklemek veya her seferinde %80’e çıkmak gerekli değildir; bu yalnızca tercih edilen koruma bandıdır.</p></div>`:'<div class="empty">Analiz için şarj kaydı ekleyin.</div>';
 
   const exp=socExposureMetrics();
-  byId('socTimeDashboard').innerHTML=exp.coveredHours?`<div class="mini-list"><div class="mini-item"><span>Kapsanan süre</span><strong>${fmt(exp.coveredHours,1)} saat</strong></div><div class="mini-item"><span>Ortalama SOC proxy</span><strong>%${fmt(exp.avgSoc,1)}</strong></div><div class="mini-item"><span>>80% süre</span><strong>${fmt(exp.above80Hours,1)} saat</strong></div><div class="mini-item"><span>>90% süre</span><strong>${fmt(exp.above90Hours,1)} saat</strong></div></div><p class="muted">Güven: ${exp.confidence}. 72 saatten uzun veri boşlukları entegrasyona alınmaz.</p>`:'<div class="empty">SOC×zaman için zaman damgalı en az iki SOC noktası gerekir. Güncel araç durumunu güncelledikçe veri oluşur.</div>';
+  byId('socTimeDashboard').innerHTML=exp.coveredHours?`<div class="mini-list"><div class="mini-item"><span>Kayda dayalı park</span><strong>${fmt(exp.parkHours,1)} saat</strong></div><div class="mini-item"><span>Ortalama park SOC</span><strong>%${fmt(exp.avgSoc,1)}</strong></div><div class="mini-item"><span>Parkta >%80</span><strong>${fmt(exp.above80Hours,1)} saat</strong></div><div class="mini-item"><span>Parkta >%90</span><strong>${fmt(exp.above90Hours,1)} saat</strong></div><div class="mini-item"><span>Belirsiz / uzun boşluk</span><strong>${fmt(exp.unknownHours+exp.ignoredHours,1)} saat</strong></div></div><p class="muted">Güven: ${exp.confidence} · Zaman aralıklarının %${fmt(exp.knownShare,0)}'i sınıflanabildi. Devam eden park süresi teyit edilene kadar sayılmaz.</p>`:'<div class="empty">Kayda dayalı park aralığı henüz yok. Bir sürüş bitişi ve bir sonraki sürüş başlangıcı ya da aynı kilometrede iki SOC gözlemi oluşturun. Bilinmeyen süreler otomatik doldurulmaz.</div>';
   const totalCons=cons?.total||weightedTripConsumption();
   byId('plannerDashboard').innerHTML=`<div class="mini-list"><div class="mini-item"><span>Güncel SOC</span><strong>%${fmt(db.settings.currentSoc,0)}</strong></div><div class="mini-item"><span>Referans tüketim</span><strong>${totalCons?fmt(totalCons,1)+' kWh/100 km':'—'}</strong></div><div class="mini-item"><span>Varsayılan rezerv</span><strong>%${fmt(db.settings.plannerReserveSoc??15,0)}</strong></div></div><p class="muted">Mesafe ve hareket saatini girerek ihtiyaç kadar hedef SOC ile en geç şarj başlangıç zamanını hesaplayın.</p>`;
 
@@ -813,13 +797,15 @@ function renderStress(){
   byId('calendarStressBadge').textContent=cal?.score==null?'Veri yok':`${fmt(cal.score,0)}/100`;byId('calendarStressBadge').className=`badge ${cal?.score==null?'neutral':cal.score<40?'good':cal.score<60?'info':cal.score<80?'warn':'bad'}`;
   byId('calendarStressDetail').innerHTML=cal?.components?.length?`<div class="mini-list">${cal.components.map(x=>`<div class="mini-item vertical"><strong>${escapeHtml(x.label)} · ${fmt(x.score,0)}/100</strong><span>${escapeHtml(x.detail)}</span></div>`).join('')}</div><p class="muted">Güven: ${cal.confidence} · ${escapeHtml(cal.summary)}</p>`:'<div class="empty">SOC×zaman veya termal veri gerekli.</div>';
 
-  byId('stressCoverage').innerHTML=`<div class="mini-list"><div class="mini-item"><span>SOC şarj verisi kapsamı</span><strong>%${fmt(e.coverage.soc,0)}</strong></div><div class="mini-item"><span>C-rate veri kapsamı</span><strong>%${fmt(e.coverage.crate,0)}</strong></div><div class="mini-item"><span>Termal bağlam kapsamı</span><strong>%${fmt(e.coverage.temp,0)}</strong></div><div class="mini-item"><span>SOC×zaman kapsanan süre</span><strong>${fmt(exp.coveredHours,1)} saat</strong></div><div class="mini-item"><span>Toplam güven göstergesi</span><strong><span class="badge ${e.coverage.cls}">${e.coverage.confidence}</span></strong></div></div><p class="muted">Eksik veri kötü kullanım sayılmaz. SOC×zaman entegrasyonunda 72 saatten uzun boşluklar yok sayılır.</p>`;
+  byId('stressCoverage').innerHTML=`<div class="mini-list"><div class="mini-item"><span>SOC şarj verisi kapsamı</span><strong>%${fmt(e.coverage.soc,0)}</strong></div><div class="mini-item"><span>C-rate veri kapsamı</span><strong>%${fmt(e.coverage.crate,0)}</strong></div><div class="mini-item"><span>Termal bağlam kapsamı</span><strong>%${fmt(e.coverage.temp,0)}</strong></div><div class="mini-item"><span>SOC×zaman kapsanan süre</span><strong>${fmt(exp.coveredHours,1)} saat</strong></div><div class="mini-item"><span>Toplam güven göstergesi</span><strong><span class="badge ${e.coverage.cls}">${e.coverage.confidence}</span></strong></div></div><p class="muted">Eksik veri kötü kullanım sayılmaz. SOC×zaman yalnızca doğrulanan park aralıklarında hesaplanır; 72 saati aşan aralıklar güvenilir sayılmaz.</p>`;
   renderBarsOrdered('stressSocBands',socBandEnergy(c),' kWh');renderBarsOrdered('stressCRateBands',cRateBandEnergy(c),' kWh');renderBarsOrdered('stressTempBands',tempBandEnergy(c),' kWh');
   byId('stressThroughput').innerHTML=`<div class="mini-list"><div class="mini-item"><span>Toplam şarj enerjisi</span><strong>${fmt(e.total,1)} kWh</strong></div><div class="mini-item"><span>Şarj tarafı EFC göstergesi</span><strong>${e.chargeEfc!=null?fmt(e.chargeEfc,2):'—'}</strong></div><div class="mini-item"><span>%80–100 bandında eklenen enerji</span><strong>${fmt(e.highSocEnergy,1)} kWh</strong></div><div class="mini-item"><span>%90–100 bandında eklenen enerji</span><strong>${fmt(e.above90Energy,1)} kWh</strong></div><div class="mini-item"><span>Yüksek termal proxy (≥50/100) enerji</span><strong>${fmt(e.thermalHigh,1)} kWh</strong></div><div class="mini-item vertical"><strong>En Yüksek Şarj Ortalaması (C-rate): ${rateSummary.maxAverage?fmt(rateSummary.maxAverage.rate,2)+'C':'—'}</strong><span>${chargeCRateSessionDetail(rateSummary.maxAverage)}</span></div><div class="mini-item vertical"><strong>En Yüksek Anlık Şarj Hızı (C-rate): ${rateSummary.maxPeak?fmt(rateSummary.maxPeak.rate,2)+'C':'—'}</strong><span>${chargeCRateSessionDetail(rateSummary.maxPeak,{peak:true})}</span></div><div class="mini-item vertical"><strong>Enerji Ağırlıklı Ortalama C-rate: ${rateSummary.weightedAverage!=null?fmt(rateSummary.weightedAverage,2)+'C':'—'}</strong><span>${weightedCRateDetail(rateSummary)}</span></div></div>`;
 
-  byId('socTimeStress').innerHTML=exp.coveredHours?`<div class="mini-list"><div class="mini-item"><span>Kapsanan zaman</span><strong>${fmt(exp.coveredHours,1)} saat</strong></div><div class="mini-item"><span>Ortalama SOC proxy</span><strong>%${fmt(exp.avgSoc,1)}</strong></div><div class="mini-item"><span>>80% SOC</span><strong>${fmt(exp.above80Hours,1)} saat · %${fmt(exp.above80Share,1)}</strong></div><div class="mini-item"><span>>90% SOC</span><strong>${fmt(exp.above90Hours,1)} saat · %${fmt(exp.above90Share,1)}</strong></div><div class="mini-item"><span>Uzun veri boşluğu</span><strong>${fmt(exp.ignoredHours,1)} saat (skorlanmadı)</strong></div></div><p class="muted">SOC noktaları arasında doğrusal değişim varsayılır; bu nedenle laboratuvar coulomb-counting ölçümü değil, calendar-aging için saha proxy'sidir.</p>`:'<div class="empty">Zaman damgalı en az iki SOC noktası gerekir.</div>';
+  byId('socTimeStress').innerHTML=`<div class="mini-list"><div class="mini-item"><span>Kayda dayalı park süresi</span><strong>${fmt(exp.parkHours,1)} saat</strong></div><div class="mini-item"><span>Kayda dayalı sürüş</span><strong>${fmt(exp.driveHours,1)} saat</strong></div><div class="mini-item"><span>Kayıtlı şarj aralığı</span><strong>${fmt(exp.chargeHours,1)} saat</strong></div><div class="mini-item"><span>Parkta ortalama SOC</span><strong>${exp.avgSoc!=null?'%'+fmt(exp.avgSoc,1):'—'}</strong></div><div class="mini-item"><span>Parkta >%80</span><strong>${fmt(exp.above80Hours,1)} saat</strong></div><div class="mini-item"><span>Parkta >%90</span><strong>${fmt(exp.above90Hours,1)} saat</strong></div><div class="mini-item"><span>Sınıflandırılamayan aralık</span><strong>${fmt(exp.unknownHours,1)} saat</strong></div><div class="mini-item"><span>72 saati aşan veri boşluğu</span><strong>${fmt(exp.ignoredHours,1)} saat</strong></div><div class="mini-item"><span>Veri güveni</span><strong><span class="badge ${exp.cls}">${exp.confidence}</span></strong></div></div><p class="muted">CalSI için yalnızca başlangıcı ve bitişi gözlemlenmiş, kilometresi değişmeyen park aralıkları kullanılır. Sürüş ve şarj süreleri ayrıca raporlanır. Yetersiz veri varsa şarj-SOC penceresi yaklaşık gösterge olarak kullanılır. Bu süreler BMS ölçümü değildir.</p>`;
   const snaps=[...(db.socSnapshots||[])].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,8);
-  byId('socSnapshotList').innerHTML=snaps.length?`<div class="mini-list">${snaps.map(x=>`<div class="mini-item"><span>${fmtDate(x.date)}${x.odo?' · '+fmt(x.odo,0)+' km':''}</span><strong>%${fmt(x.soc,0)} <button class="link-btn tiny" onclick="deleteSocSnapshot('${x.id}')">Sil</button></strong></div>`).join('')}</div>`:'<div class="empty">Henüz manuel SOC noktası yok.</div>';
+  byId('socSnapshotList').innerHTML=snaps.length?`<div class="mini-list">${snaps.map(x=>`<div class="mini-item"><span>${fmtDate(x.date)} · ${escapeHtml({drive_start:'Sürüş başlangıcı',drive_end:'Sürüş bitişi',drive_end_unpaired:'Sürüş bitişi (başlangıç yok)',observation:'Durum gözlemi'}[x.kind]||'Durum gözlemi')}${x.odo!=null?' · '+fmt(x.odo,0)+' km':''}</span><strong>%${fmt(x.soc,0)} <button class="link-btn tiny" onclick="deleteSocSnapshot('${x.id}')">Sil</button></strong></div>`).join('')}</div>`:'<div class="empty">Henüz zaman damgalı SOC noktası yok.</div>';
+  const sessions=[...db.driveSessions].sort((a,b)=>String(b.endAt||b.startAt).localeCompare(String(a.endAt||a.startAt))).slice(0,10);
+  byId('driveSessionList').innerHTML=sessions.length?`<div class="mini-list">${sessions.map(x=>`<div class="mini-item vertical"><strong>${fmtDate(x.endAt)} · ${x.complete?'Tam sürüş':'Başlangıcı bilinmeyen bitiş'}</strong><span>${x.complete?fmt(x.distance,1)+' km · %'+fmt(x.startSoc,0)+' → %'+fmt(x.endSoc,0):fmt(x.endOdo,0)+' km · %'+fmt(x.endSoc,0)}${x.consumption!=null?' · '+fmt(x.consumption,1)+' kWh/100 km':''} <button class="link-btn tiny" onclick="deleteDriveSession('${x.id}')">Sil</button></span></div>`).join('')}</div>`:'<div class="empty">Henüz sürüş bitiş kaydı yok.</div>';
 
   const notes=[];if(r.cycle?.score!=null&&r.calendar?.score!=null){notes.push(r.cycle.score>r.calendar.score?'Son dönemde cycle/charge maruziyeti calendar maruziyetinden daha baskın.':'Son dönemde calendar maruziyeti cycle/charge maruziyeti kadar veya daha baskın.');}
   if(e.fast2Share!=null&&e.fast2Share>10)notes.push(`Şarj enerjisinin %${fmt(e.fast2Share,1)}'i 2C üzeri oturumlarda gerçekleşmiş.`);
@@ -944,7 +930,17 @@ D.plannerWeatherBtn?.addEventListener('click',async()=>{
   }catch(err){D.plannerWeatherStatus.textContent=`Hava verisi alınamadı: ${err.message}`;}
   finally{D.plannerWeatherBtn.disabled=false;}
 });
-window.deleteSocSnapshot=id=>{if(confirm('Bu manuel SOC noktası silinsin mi?')){db.socSnapshots=(db.socSnapshots||[]).filter(x=>x.id!==id);save();}};
+window.deleteSocSnapshot=id=>{
+  const snap=db.socSnapshots.find(x=>x.id===id);if(!snap)return;
+  if(!confirm('Bu SOC noktası silinsin mi? Bağlı sürüş aralıkları geçersizleşebilir.'))return;
+  if(snap.sessionId){
+    db.driveSessions=db.driveSessions.filter(x=>x.id!==snap.sessionId);
+    db.trips=db.trips.filter(x=>x.linkedDriveId!==snap.sessionId);
+    db.socSnapshots=db.socSnapshots.filter(x=>x.sessionId!==snap.sessionId);
+    if(db.activeDrive?.id===snap.sessionId)db.activeDrive=null;
+  }else db.socSnapshots=db.socSnapshots.filter(x=>x.id!==id);
+  save();
+};
 
 D.settingsForm.addEventListener('submit',e=>{
   e.preventDefault();
@@ -955,10 +951,66 @@ D.settingsForm.addEventListener('submit',e=>{
   if(!(next.ownershipStartSoc>=0&&next.ownershipStartSoc<=100&&next.currentSoc>=0&&next.currentSoc<=100))return alert('SOC değerleri %0–100 arasında olmalı.');
   db.settings=next;D.crateCapacity.value=next.referenceCapacity;if(D.plannerReserveSoc)D.plannerReserveSoc.value=next.plannerReserveSoc;if(D.plannerMargin)D.plannerMargin.value=next.plannerMarginPct;save();alert('Ayarlar kaydedildi.');
 });
+function quickReading(){
+  const odo=Number(D.quickCurrentOdo.value),soc=Number(D.quickCurrentSoc.value);
+  if(D.quickCurrentOdo.value===''||D.quickCurrentSoc.value===''||!(odo>0&&soc>=0&&soc<=100)){
+    alert('Lütfen geçerli kilometre ve SOC girin.');return null;
+  }
+  if(Number(db.settings.currentOdo)>0&&odo<Number(db.settings.currentOdo)){
+    alert('Kilometre, mevcut kayıttan düşük olamaz. Geçmiş bir veriyi düzeltmek için ilgili kaydı düzenleyin.');return null;
+  }
+  return{odo,soc};
+}
+function recordCurrent(odo,soc,kind='observation',extra={}){
+  const now=new Date().toISOString();
+  db.settings.currentOdo=odo;db.settings.currentSoc=soc;db.settings.currentSocUpdatedAt=now;
+  db.socSnapshots??=[];
+  db.socSnapshots.push({id:uid(),date:now,odo,soc,kind,source:'quick',sourceLabel:{drive_start:'Sürüş başlangıcı',drive_end:'Sürüş bitişi',drive_end_unpaired:'Sürüş bitişi (başlangıç yok)'}[kind]||'Güncel araç durumu',...extra});
+  return now;
+}
 D.quickStatusForm.addEventListener('submit',e=>{
-  e.preventDefault();const odo=+D.quickCurrentOdo.value,soc=+D.quickCurrentSoc.value;if(!(odo>0&&soc>=0&&soc<=100))return alert('Geçerli kilometre ve SOC girin.');
-  const now=new Date().toISOString();db.settings.currentOdo=odo;db.settings.currentSoc=soc;db.settings.currentSocUpdatedAt=now;db.socSnapshots??=[];db.socSnapshots.push({id:uid(),date:now,odo,soc,source:'quick',sourceLabel:'Güncel araç durumu'});save();
+  e.preventDefault();const v=quickReading();if(!v)return;
+  if(db.activeDrive&&!confirm('Devam eden sürüş sırasında manuel durum kaydı, sürüş süresini parçalara ayırır. Devam edilsin mi?'))return;
+  recordCurrent(v.odo,v.soc);save();
 });
+D.quickDriveStartBtn.addEventListener('click',()=>{
+  if(db.activeDrive)return alert('Devam eden sürüşü önce bitirin.');
+  const v=quickReading();if(!v)return;
+  const sessionId=uid(),startAt=recordCurrent(v.odo,v.soc,'drive_start',{sessionId});
+  db.activeDrive={id:sessionId,startAt,startOdo:v.odo,startSoc:v.soc};
+  save();
+});
+D.quickDriveEndBtn.addEventListener('click',()=>{
+  const v=quickReading();if(!v)return;
+  const start=db.activeDrive;
+  const consumption=D.quickDriveConsumption.value===''?null:Number(D.quickDriveConsumption.value);
+  if(consumption!==null&&(!(consumption>0)||consumption>100))return alert('Tüketim değerini kontrol edin (kWh/100 km).');
+  if(start){
+    if(v.odo<start.startOdo)return alert('Bitiş km, sürüş başlangıcından küçük olamaz.');
+    const minutes=(Date.now()-new Date(start.startAt).getTime())/60000;
+    if(minutes<0.1)return alert('Sürüş başlangıcı ile bitişi arasında yeterli süre yok.');
+    if(minutes>72*60&&!confirm('Sürüş 72 saati aşmış görünüyor. Kaydı yine de tamamlamak ister misiniz?'))return;
+    if(v.soc>start.startSoc+3&&!confirm('Bitiş SOC, başlangıçtan belirgin yüksek. Değerler doğru mu?'))return;
+  }
+  const newSessionId=start?.id||uid();
+  const endAt=recordCurrent(v.odo,v.soc,start?'drive_end':'drive_end_unpaired',{sessionId:newSessionId});
+  const drive={id:newSessionId,startAt:start?.startAt||null,endAt,startOdo:start?.startOdo??null,endOdo:v.odo,startSoc:start?.startSoc??null,endSoc:v.soc,distance:start?Math.max(0,v.odo-start.startOdo):null,consumption,complete:!!start};
+  db.driveSessions.push(drive);
+  if(start&&drive.distance>0&&consumption!=null){
+    // Trip consumption is a trip metric, NOT the vehicle's "since last charge" counter.
+    const ended=new Date(endAt),tripDay=new Date(ended.getTime()-ended.getTimezoneOffset()*60000).toISOString().slice(0,10);
+    db.trips.push({id:uid(),date:tripDay,distance:drive.distance,consumption,startSoc:start.startSoc,endSoc:v.soc,temp:null,route:'Dashboard · Sürüş kaydı',notes:'Sürüş/park hızlı girişi',linkedDriveId:drive.id});
+  }
+  db.activeDrive=null;D.quickDriveConsumption.value='';save();
+  if(!start)alert('Sürüş bitişi ve park başlangıcı kaydedildi. Başlangıç bilinmediğinden bu yolculuğun tüketimi/mesafesi hesaplanmadı.');
+});
+window.deleteDriveSession=id=>{
+  if(!confirm('Bu sürüş kaydı ve buna bağlı SOC/sürüş noktaları silinsin mi?'))return;
+  db.driveSessions=db.driveSessions.filter(x=>x.id!==id);
+  db.socSnapshots=db.socSnapshots.filter(x=>x.sessionId!==id);
+  db.trips=db.trips.filter(x=>x.linkedDriveId!==id);
+  save();
+};
 
 function addProvider(name){const n=String(name||'').trim();if(!n)return;if(!db.providers.some(x=>x.toLocaleLowerCase('tr-TR')===n.toLocaleLowerCase('tr-TR')))db.providers.push(n);db.providers.sort((a,b)=>a.localeCompare(b,'tr'));save()}
 D.providerAddBtn.onclick=()=>{addProvider(D.providerNew.value);D.providerNew.value=''};
@@ -978,6 +1030,7 @@ function exportCsv(name,headers,rows){const csv='\ufeff'+[headers,...rows].map(r
 D.exportChargesCsv.onclick=()=>exportCsv('sarj_kayitlari.csv',['Tarih','Km','Baslangic SOC','Bitis SOC','Tur','Donem','Sure dk','Ortalama Guc kW','Maks Guc kW','Ortalama C-rate','Maks C-rate','Enerji kWh','Saglayici','Maliyet TL','Ortam Sicakligi','Sicaklik Kaynagi','Batarya Sicakligi','Park Ortami','Park Saati','Sarj Oncesi Surus dk','Konum','Not'],db.charges.map(x=>[x.date,x.odo,x.startSoc,x.endSoc,x.type,scopeLabel(x.scope),x.durationMin,chargeAveragePower(x),x.power,chargeAverageCRate(x),chargePeakCRate(x),x.energy,x.provider,x.cost,x.temp,x.tempSource,x.batteryTemp,x.parking,x.parkHours,x.preDriveMin,x.location,x.notes]));
 D.exportConsumptionCsv.onclick=()=>exportCsv('tuketim_sayac_kayitlari.csv',['Tarih','Km','Son Sarjdan Beri kWh/100km','Sahiplik Toplam Ort kWh/100km','Not'],db.consumptionSnapshots.map(x=>[x.date,x.odo,x.sinceCharge,x.total,x.notes]));
 D.exportTripsCsv.onclick=()=>exportCsv('surus_kayitlari.csv',['Tarih','Mesafe km','Tuketim kWh/100','Baslangic SOC','Bitis SOC','Sicaklik','Rota','Not'],db.trips.map(x=>[x.date,x.distance,x.consumption,x.startSoc,x.endSoc,x.temp,x.route,x.notes]));
+D.exportDriveSessionsCsv.onclick=()=>exportCsv('surus_park_zaman_kayitlari.csv',['Baslangic','Bitis','Baslangic km','Bitis km','Baslangic SOC','Bitis SOC','Mesafe km','Tuketim kWh/100 km','Tam kayit'],db.driveSessions.map(x=>[x.startAt,x.endAt,x.startOdo,x.endOdo,x.startSoc,x.endSoc,x.distance,x.consumption,x.complete?'Evet':'Hayir']));
 
 function setDefaultDateTimes(){const now=new Date();const local=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().slice(0,16);if(!D.chargeDate.value)D.chargeDate.value=local;if(!D.consumptionDate.value)D.consumptionDate.value=local;if(!D.tripDate.value)D.tripDate.value=now.toISOString().slice(0,10);if(!D.sohDate.value)D.sohDate.value=now.toISOString().slice(0,10);if(D.plannerDeparture&&!D.plannerDeparture.value){const dep=new Date(now);dep.setDate(dep.getDate()+1);dep.setHours(7,30,0,0);D.plannerDeparture.value=new Date(dep.getTime()-dep.getTimezoneOffset()*60000).toISOString().slice(0,16)}}
 setDefaultDateTimes();if(!D.consumptionOdo.value)D.consumptionOdo.value=db.settings.currentOdo||'';renderAll();

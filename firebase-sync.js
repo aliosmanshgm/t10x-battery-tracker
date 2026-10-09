@@ -63,6 +63,8 @@ function meaningful(data) {
     data?.consumptionSnapshots?.length ||
     data?.sohTests?.length ||
     data?.socSnapshots?.length ||
+    data?.driveSessions?.length ||
+    Boolean(data?.activeDrive) ||
     data?.meta?.updatedAt
   );
 }
