@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="T10X Batarya" />
   <meta name="mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="manifest.webmanifest" />
-  <title>T10X Batarya & Şarj Takip v0.9.5 · Premium / Apple · Charge Planner</title>
+  <title>T10X Batarya & Şarj Takip v0.9.6 · Premium / Apple · Charge Planner</title>
   <link rel="stylesheet" href="app.css" />
 </head>
 <body>
@@ -63,6 +63,7 @@
   <main>
     <section id="dashboard" class="panel active">
       <div class="cards" id="dashboardCards"></div>
+      <article class="card range-dashboard-card" id="rangeDashboard" aria-live="polite"></article>
       <div class="grid two">
         <article class="card health-score-card">
           <div class="card-head"><h2>Kullanım Profili Skoru</h2><span id="healthConfidence" class="badge neutral"></span></div>
@@ -625,6 +626,7 @@
         <label>Uygulama Takip Başlangıç Kilometresi<input id="trackingStartOdo" type="number" min="0" step="1"></label>
         <label>Güncel Kilometre<input id="currentOdo" type="number" min="0" step="1"></label>
         <label>Güncel SOC (%)<input id="currentSoc" type="number" min="0" max="100" step="1"></label>
+        <label>WLTP Referans Menzili (km)<input id="wltpRangeKm" type="number" min="100" max="1200" step="1" value="523"></label>
         <label>Referans Kapasite (kWh)<input id="referenceCapacity" type="number" min="1" step="0.1"></label>
         <label>Enerji Dengesi İçin Kullanılabilir Kapasite (kWh) · opsiyonel<input id="batteryUsableCapacity" type="number" min="30" max="150" step="0.1" placeholder="Bilinmiyorsa 88,5 kWh referans"></label>
         <label>AC Şarjda Bataryaya Ulaşan Enerji (%) · varsayım<input id="acChargeEfficiency" type="number" min="75" max="100" step="1" value="90"></label>
@@ -659,13 +661,14 @@
     </section>
   </main>
 
-  <footer>v0.9.5 · Premium / Apple · Charge Planner · Engineer Edition · Tek kullanıcı giriş kapısı · Firebase Sync · GitHub Pages · iPhone uyumlu · km/SOC eksik geçmiş kayıt desteği · süre→ortalama güç/C-rate</footer>
+  <footer>v0.9.6 · Premium / Apple · Charge Planner · Engineer Edition · Tek kullanıcı giriş kapısı · Firebase Sync · GitHub Pages · iPhone uyumlu · km/SOC eksik geçmiş kayıt desteği · süre→ortalama güç/C-rate</footer>
   </div>
 
   <script src="weather.js"></script>
   <script src="soc-model.js"></script>
   <script src="consumption-model.js"></script>
   <script src="soh-model.js"></script>
+  <script src="range-model.js"></script>
   <script src="app.js"></script>
   <script type="module" src="firebase-sync.js"></script>
   <script>

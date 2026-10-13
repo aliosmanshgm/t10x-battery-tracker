@@ -1,5 +1,5 @@
-const STORAGE_KEY='t10xBatteryTracker_v13';
-const LEGACY_KEYS=['t10xBatteryTracker_v12','t10xBatteryTracker_v11','t10xBatteryTracker_v10','t10xBatteryTracker_v9','t10xBatteryTracker_v8','t10xBatteryTracker_v6','t10xBatteryTracker_v5','t10xBatteryTracker_v4','t10xBatteryTracker_v3','t10xBatteryTracker_v2','t10xBatteryTracker_v1'];
+const STORAGE_KEY='t10xBatteryTracker_v14';
+const LEGACY_KEYS=['t10xBatteryTracker_v13','t10xBatteryTracker_v12','t10xBatteryTracker_v11','t10xBatteryTracker_v10','t10xBatteryTracker_v9','t10xBatteryTracker_v8','t10xBatteryTracker_v6','t10xBatteryTracker_v5','t10xBatteryTracker_v4','t10xBatteryTracker_v3','t10xBatteryTracker_v2','t10xBatteryTracker_v1'];
 const DEFAULT_PROVIDERS=[
   "ZES Şarj",
   "Trugo Şarj",
@@ -163,10 +163,10 @@ const DEFAULT_PROVIDERS=[
   "Ev / Kendi AC Şarjım"
 ];
 const defaults={
-  meta:{schemaVersion:14,updatedAt:''},
+  meta:{schemaVersion:15,updatedAt:''},
   settings:{
     vehicleName:'T10X Uzun Menzil',batteryChemistry:'NMC',ownershipStartOdo:32356,ownershipStartSoc:59,ownershipStartDate:'',trackingStartOdo:33537,currentOdo:33537,currentSoc:76,
-    referenceCapacity:88.5,preferredMinSoc:20,preferredMaxSoc:80,
+    referenceCapacity:88.5,wltpRangeKm:523,preferredMinSoc:20,preferredMaxSoc:80,
     stressWindow:12,plannerReserveSoc:15,plannerMarginPct:10,mgmCity:'ANKARA',currentSocUpdatedAt:'',chargingLedgerComplete:false,batteryUsableCapacity:null,acChargeEfficiency:90,dcChargeEfficiency:96
   },
   providers:[...DEFAULT_PROVIDERS],
@@ -182,7 +182,7 @@ const domIds=[
   'sohForm','sohDate','sohMethod','sohStartSoc','sohEndSoc','sohEnergy','sohType','sohLoss','sohMeasuredSoh','sohNetEnergy','sohReference','sohSource','sohTemp','sohOdo','sohNotes',
   'plannerForm','plannerCurrentSoc','plannerDistance','plannerConsumption','plannerReserveSoc','plannerMargin','plannerDeparture','plannerChargeType','plannerPower','plannerAmbientTemp','plannerParking','plannerParkHours','plannerPreDriveMin','plannerWeatherBtn','plannerWeatherStatus','plannerResult','plannerBadge','plannerThermal','plannerWeatherDetail','plannerMgmLink',
   'crateForm','crateCapacity','cratePower','crateStartSoc','crateEndSoc','crateTemp',
-  'settingsForm','vehicleName','batteryChemistry','ownershipStartOdo','ownershipStartSoc','ownershipStartDate','trackingStartOdo','currentOdo','currentSoc','referenceCapacity','preferredMinSoc','preferredMaxSoc','stressWindow','plannerReserveDefault','plannerMarginDefault','mgmCity','clearAllBtn',
+  'settingsForm','vehicleName','batteryChemistry','ownershipStartOdo','ownershipStartSoc','ownershipStartDate','trackingStartOdo','currentOdo','currentSoc','referenceCapacity','wltpRangeKm','preferredMinSoc','preferredMaxSoc','stressWindow','plannerReserveDefault','plannerMarginDefault','mgmCity','clearAllBtn',
   'chargeLedgerComplete','energyBalanceDetail','batteryUsableCapacity','acChargeEfficiency','dcChargeEfficiency','quickStatusForm','quickCurrentOdo','quickCurrentSoc','quickSinceCharge','quickDriveConsumption','quickDriveStartBtn','quickDriveEndBtn','driveStatusInfo','providerNew','providerAddBtn','providerResetBtn','providerManager',
   'exportJsonBtn','importJsonInput','exportChargesCsv','exportConsumptionCsv','exportTripsCsv','exportDriveSessionsCsv'
 ];
@@ -190,7 +190,7 @@ const D=Object.fromEntries(domIds.map(id=>[id,byId(id)]));
 
 function migrate(obj){
   const out={...structuredClone(defaults),...(obj||{})};
-  out.meta={...structuredClone(defaults.meta),...(obj?.meta||{}),schemaVersion:14};
+  out.meta={...structuredClone(defaults.meta),...(obj?.meta||{}),schemaVersion:15};
   out.settings={...structuredClone(defaults.settings),...(obj?.settings||{})};
   delete out.settings.targetDcShare;delete out.settings.balanceWindow;
   if(obj?.settings&&obj.settings.ownershipStartSoc==null){
@@ -216,14 +216,14 @@ function load(){
   }catch{return structuredClone(defaults)}
 }
 function persistLocal({emit=false}={}){localStorage.setItem(STORAGE_KEY,JSON.stringify(db));renderAll();if(emit)window.dispatchEvent(new CustomEvent('t10x:data-changed',{detail:{db:structuredClone(db)}}));}
-function save(){db.meta={...(db.meta||{}),schemaVersion:14,updatedAt:new Date().toISOString()};persistLocal({emit:true})}
+function save(){db.meta={...(db.meta||{}),schemaVersion:15,updatedAt:new Date().toISOString()};persistLocal({emit:true})}
 
 window.T10XApp={
   getData:()=>structuredClone(db),
   replaceData:(next,{emit=false}={})=>{db=migrate(next||{});persistLocal({emit});return structuredClone(db)},
   hasMeaningfulData:()=>Boolean(db.charges.length||db.trips.length||db.consumptionSnapshots.length||db.sohTests.length||db.socSnapshots.length||db.driveSessions.length||!!db.activeDrive||db.meta?.updatedAt),
   storageKey:STORAGE_KEY,
-  schemaVersion:14
+  schemaVersion:15
 };
 
 function uid(){return crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random())}
@@ -616,6 +616,40 @@ function renderDashboard(){
     ['Enerji Ağırlıklı Ortalama C-rate',cRateHistory.weightedAverage!=null?fmt(cRateHistory.weightedAverage,2)+'C':'—',weightedCRateDetail(cRateHistory)]
   ];
   byId('dashboardCards').innerHTML=cards.map(x=>`<div class="metric"><div class="label">${x[0]}</div><div class="value">${x[1]}</div><div class="sub">${x[2]}</div></div>`).join('');
+  // 523 km WLTP vs owner-specific evidence. This is a range scenario, not a BMS range reading.
+  const range=window.T10XRange.estimate({
+    driveSessions:db.driveSessions,trips:db.trips,charges:ownerCharges(),
+    currentSoc:db.settings.currentSoc,reserveSoc:db.settings.plannerReserveSoc,
+    nominalCapacity:db.settings.referenceCapacity,
+    usableCapacity:db.settings.batteryUsableCapacity,
+    wltpRangeKm:db.settings.wltpRangeKm,
+    consumptionMetrics:cost100.calculated,latestSnapshot:cons
+  });
+  const asKm=value=>value==null?'—':fmt(value,0)+' km';
+  const pct=range.wltpDifference;
+  const difference=pct==null?'—':`${pct>0?'+':''}${fmt(pct,1)}%`;
+  const progress=pct==null?0:Math.max(0,Math.min(100,range.fullRange/range.wltpRangeKm*100));
+  const methodTitle=range.method==='tracked-drive'?'Sürüş kaydından hesap':range.method==='manual-trip'?'Yolculuk SOC/km verisinden hesap':range.method==='consumption-nominal'?'Nominal kapasiteyle kaba tahmin':range.method==='consumption-usable'?'Kapasite + tüketim senaryosu':'Tüketim verisiyle tahmin';
+  const rangeBox=byId('rangeDashboard');
+  rangeBox.innerHTML=`<div class="card-head"><h2>Kullanımıma Göre Tahmini Menzil</h2><span class="badge neutral">${escapeHtml(range.evidenceGrade)}</span></div>
+    <div class="range-overview">
+      <div class="range-primary"><span>%100 SOC karşılığı · ${escapeHtml(methodTitle)}</span><strong>${asKm(range.fullRange)}</strong><small>WLTP referansı ${fmt(range.wltpRangeKm,0)} km · aynı test koşulları değildir</small></div>
+      <div class="range-metrics">
+        <div><span>Güncel %${range.currentSoc==null?'—':fmt(range.currentSoc,0)} SOC → %${fmt(range.reserveSoc,0)} rezerv</span><strong>${asKm(range.remainingToReserve)}</strong></div>
+        <div><span>%20–80 SOC arasında</span><strong>${asKm(range.band20to80)}</strong></div>
+      </div>
+    </div>
+    <div class="range-benchmark"><div class="range-benchmark-label"><span>WLTP referans menzili: <strong>${fmt(range.wltpRangeKm,0)} km</strong></span><strong>${escapeHtml(difference)}</strong></div>
+      <div class="range-track"><span style="width:${progress.toFixed(1)}%"></span></div></div>
+    <p class="range-source"><strong>Hesap kaynağı:</strong> ${escapeHtml(range.label)}${range.evidence?' · '+escapeHtml(range.evidence):''}</p>
+    <p class="muted">${escapeHtml(range.note)}</p>
+    <details class="range-details"><summary>Menzili nasıl hesaplıyoruz?</summary>
+      <p><strong>Km + SOC verisi varsa:</strong> Şarj yapılmamış sürüşlerde toplam km × 100 / toplam SOC düşüşü. Kullanılan gözlem: ${escapeHtml(range.tracked.count+' doğrulanmış sürüş; '+range.manual.count+' bağımsız manuel yolculuk')}.</p>
+      <p><strong>Yoksa tüketimden:</strong> 100 × kapasite (kWh) / tüketim (kWh/100 km). Bilinen kullanılabilir kapasite girilmediyse 88,5 kWh nominal referans kullanılır; bu gerçek kullanılabilir enerji değildir.</p>
+      <p><strong>Rezervli menzil:</strong> %100 eşdeğer menzil × (güncel SOC − rezerv SOC) / 100. 20–80 penceresi eşdeğer menzilin %60'ıdır. Trafik, Ankara hava koşulları, hız, ısıtma/klima, lastikler ve batarya sıcaklığı sonucu değiştirebilir.</p>
+      <p>Eksik SOC, çok kısa sürüş, mantıksız km/SOC değişimi veya kayıtta şarj bulunduğu tespit edilen sürüşler doğrudan SOC hesabına katılmaz. Sonuç otomobilin BMS menzil göstergesi değil, kayıtlarınızın yaklaşık yorumudur.</p>
+    </details>`;
+
 
   const hs=batteryHealthScore();
   byId('healthScoreValue').textContent=hs.score==null?'—':fmt(hs.score,0);
@@ -920,7 +954,7 @@ function renderProviders(){
 }
 function renderSettings(){
   const s=db.settings;
-  D.vehicleName.value=s.vehicleName;D.batteryChemistry.value=s.batteryChemistry;D.ownershipStartOdo.value=s.ownershipStartOdo??32356;D.ownershipStartSoc.value=s.ownershipStartSoc??59;D.ownershipStartDate.value=s.ownershipStartDate||'';D.trackingStartOdo.value=s.trackingStartOdo??33537;D.currentOdo.value=s.currentOdo??33537;D.currentSoc.value=s.currentSoc??76;D.referenceCapacity.value=s.referenceCapacity;D.preferredMinSoc.value=s.preferredMinSoc;D.preferredMaxSoc.value=s.preferredMaxSoc;D.stressWindow.value=s.stressWindow??12;D.plannerReserveDefault.value=s.plannerReserveSoc??15;D.plannerMarginDefault.value=s.plannerMarginPct??10;D.mgmCity.value=s.mgmCity||'ANKARA';D.batteryUsableCapacity.value=s.batteryUsableCapacity??'';D.acChargeEfficiency.value=s.acChargeEfficiency??90;D.dcChargeEfficiency.value=s.dcChargeEfficiency??96;if(!D.crateCapacity.matches(':focus'))D.crateCapacity.value=s.referenceCapacity;if(D.plannerReserveSoc&&!D.plannerReserveSoc.matches(':focus'))D.plannerReserveSoc.value=s.plannerReserveSoc??15;if(D.plannerMargin&&!D.plannerMargin.matches(':focus'))D.plannerMargin.value=s.plannerMarginPct??10;renderProviders();
+  D.vehicleName.value=s.vehicleName;D.batteryChemistry.value=s.batteryChemistry;D.ownershipStartOdo.value=s.ownershipStartOdo??32356;D.ownershipStartSoc.value=s.ownershipStartSoc??59;D.ownershipStartDate.value=s.ownershipStartDate||'';D.trackingStartOdo.value=s.trackingStartOdo??33537;D.currentOdo.value=s.currentOdo??33537;D.currentSoc.value=s.currentSoc??76;D.referenceCapacity.value=s.referenceCapacity;D.wltpRangeKm.value=s.wltpRangeKm??523;D.preferredMinSoc.value=s.preferredMinSoc;D.preferredMaxSoc.value=s.preferredMaxSoc;D.stressWindow.value=s.stressWindow??12;D.plannerReserveDefault.value=s.plannerReserveSoc??15;D.plannerMarginDefault.value=s.plannerMarginPct??10;D.mgmCity.value=s.mgmCity||'ANKARA';D.batteryUsableCapacity.value=s.batteryUsableCapacity??'';D.acChargeEfficiency.value=s.acChargeEfficiency??90;D.dcChargeEfficiency.value=s.dcChargeEfficiency??96;if(!D.crateCapacity.matches(':focus'))D.crateCapacity.value=s.referenceCapacity;if(D.plannerReserveSoc&&!D.plannerReserveSoc.matches(':focus'))D.plannerReserveSoc.value=s.plannerReserveSoc??15;if(D.plannerMargin&&!D.plannerMargin.matches(':focus'))D.plannerMargin.value=s.plannerMarginPct??10;renderProviders();
 }
 function renderAll(){renderDashboard();renderCharges();renderConsumptionSnapshots();renderTrips();renderSoh();renderAnalytics();renderStress();renderSettings();updateSohPreview();updateChargePreview();renderCrate();renderPlanner()}
 
@@ -1033,8 +1067,9 @@ window.deleteSocSnapshot=id=>{
 
 D.settingsForm.addEventListener('submit',e=>{
   e.preventDefault();
-  const next={vehicleName:D.vehicleName.value.trim(),batteryChemistry:D.batteryChemistry.value.trim(),ownershipStartOdo:+D.ownershipStartOdo.value||0,ownershipStartSoc:+D.ownershipStartSoc.value,ownershipStartDate:D.ownershipStartDate.value||'',trackingStartOdo:+D.trackingStartOdo.value||0,currentOdo:+D.currentOdo.value||0,currentSoc:+D.currentSoc.value,currentSocUpdatedAt:db.settings.currentSocUpdatedAt||'',referenceCapacity:+D.referenceCapacity.value,preferredMinSoc:+D.preferredMinSoc.value,preferredMaxSoc:+D.preferredMaxSoc.value,stressWindow:+D.stressWindow.value,plannerReserveSoc:+D.plannerReserveDefault.value,plannerMarginPct:+D.plannerMarginDefault.value,mgmCity:(D.mgmCity.value.trim()||'ANKARA').toLocaleUpperCase('tr-TR'),chargingLedgerComplete:!!db.settings.chargingLedgerComplete,batteryUsableCapacity:D.batteryUsableCapacity.value===''?null:Number(D.batteryUsableCapacity.value),acChargeEfficiency:Number(D.acChargeEfficiency.value),dcChargeEfficiency:Number(D.dcChargeEfficiency.value)};
+  const next={vehicleName:D.vehicleName.value.trim(),batteryChemistry:D.batteryChemistry.value.trim(),ownershipStartOdo:+D.ownershipStartOdo.value||0,ownershipStartSoc:+D.ownershipStartSoc.value,ownershipStartDate:D.ownershipStartDate.value||'',trackingStartOdo:+D.trackingStartOdo.value||0,currentOdo:+D.currentOdo.value||0,currentSoc:+D.currentSoc.value,currentSocUpdatedAt:db.settings.currentSocUpdatedAt||'',referenceCapacity:+D.referenceCapacity.value,wltpRangeKm:+D.wltpRangeKm.value,preferredMinSoc:+D.preferredMinSoc.value,preferredMaxSoc:+D.preferredMaxSoc.value,stressWindow:+D.stressWindow.value,plannerReserveSoc:+D.plannerReserveDefault.value,plannerMarginPct:+D.plannerMarginDefault.value,mgmCity:(D.mgmCity.value.trim()||'ANKARA').toLocaleUpperCase('tr-TR'),chargingLedgerComplete:!!db.settings.chargingLedgerComplete,batteryUsableCapacity:D.batteryUsableCapacity.value===''?null:Number(D.batteryUsableCapacity.value),acChargeEfficiency:Number(D.acChargeEfficiency.value),dcChargeEfficiency:Number(D.dcChargeEfficiency.value)};
   if((next.batteryUsableCapacity!==null&&(!(next.batteryUsableCapacity>30)||next.batteryUsableCapacity>150))||next.acChargeEfficiency<75||next.acChargeEfficiency>100||next.dcChargeEfficiency<75||next.dcChargeEfficiency>100)return alert('Kapasite veya şarj verimi değerlerini kontrol edin.');
+  if(!(next.wltpRangeKm>=100&&next.wltpRangeKm<=1200))return alert('WLTP referans menzili 100–1200 km arasında olmalı.');
   if(next.preferredMaxSoc<=next.preferredMinSoc)return alert('Üst SOC sınırı alt sınırdan büyük olmalı.');
   if(!(next.stressWindow>=3&&next.stressWindow<=100))return alert('Stres analizi penceresi 3–100 şarj arasında olmalı.');
   if(!(next.plannerReserveSoc>=0&&next.plannerReserveSoc<=40&&next.plannerMarginPct>=0&&next.plannerMarginPct<=50))return alert('Planlayıcı rezerv/güvenlik payı değerlerini kontrol edin.');

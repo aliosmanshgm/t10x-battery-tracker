@@ -1,4 +1,4 @@
-# T10X Batarya & Şarj Takip v0.9.5 — SOH Evidence & Audit
+# T10X Batarya & Şarj Takip v0.9.6 — SOH Evidence & Audit
 
 Kişisel T10X (88,5 kWh NMC) kullanımı için local-first + Firebase senkronizasyonlu, iPhone/PWA uyumlu batarya ve şarj takip uygulaması.
 
@@ -49,7 +49,7 @@ Repo köküne bu klasörün içindeki dosyaları yükleyin.
 
 Settings > Pages > Deploy from a branch > `main` / `(root)`
 
-Yeni service-worker cache anahtarı `t10x-battery-v0.9.5-soh-audit` olarak güncellendi; önceki sürümlerin önbellekleri aktivasyon sırasında temizlenir.
+Yeni service-worker cache anahtarı `t10x-battery-v0.9.6-soh-audit` olarak güncellendi; önceki sürümlerin önbellekleri aktivasyon sırasında temizlenir.
 
 ## Bilimsel sınır
 
@@ -116,7 +116,7 @@ Formül: `E_tüketim ≈ Σ(E_AC × η_AC) + Σ(E_DC × η_DC) + (SOC_ilk − SO
 Eksik kWh, tutarsız enerji dengesi veya başlangıç/güncel SOC/odometre yoksa sahte bir toplam sunulmaz. Eski manuel `total` değerleri korunur ancak hesaplamalarda kullanılmaz.
 
 
-## v0.9.5 · SOH metodoloji ve gösterge denetimi
+## v0.9.6 · SOH metodoloji ve gösterge denetimi
 
 - SOH girişleri **BMS/servis beyanı**, **ölçülmüş net batarya kWh** ve **istasyon kWh (duyarlılık senaryosu)** olarak ayrıldı. Şarj kaybı artık zorunlu/değerli varsayılan alan değil; boş bırakılırsa örnek AC %5–15 ve DC %2–12 *kullanıcıyı yönlendirmeyen duyarlılık senaryoları* gösterilir. Bunlar T10X için doğrulanmış verim veya güven aralığı değildir.
 - 88,5 kWh nominal paket kapasitesi otomatik yeni-batarya **kullanılabilir** SOH referansı olarak alınmaz. Referans yoksa SOH yüzdesi hesaplanmaz.
@@ -131,3 +131,28 @@ Eksik kWh, tutarsız enerji dengesi veya başlangıç/güncel SOC/odometre yoksa
 **Kaynaklar:** DOI:10.1002/ese3.1581 (SOC/SOH referans test prosedürleri), DOI:10.1016/j.energy.2017.03.015 (şarj verimliliğinin ölçüme ve donanıma bağımlılığı).
 
 **Teknik denetim:** Detay ve kısıtlar için `TEKNIK_DENETIM_NOTLARI.md` dosyasına bakınız.
+
+## v0.9.6 — Dashboard: kişisel menzil tahmini
+
+### Hangi veriler kullanılıyor?
+
+1. **Tercih edilen birincil yöntem:** `driveSessions` içindeki başlangıç/bitiş kilometresi, SOC ve zaman damgası bulunan tam sürüşler. Kayıtlı şarj işlemi sürüş zaman aralığına giriyorsa veri dışlanır. SOC farkı en az 4 yüzde puanı, sürüş en az 20 km olmalı; 48 saatten uzun sürüşler ve fiziksel açıdan tutarsız km/SOC değerleri kullanılmaz.
+2. Birinci kaynak yoksa, **bağımsız manuel yolculuklarda** (`trips`) mesafe + SOC başlangıç/bitiş kullanılır. Otomatik oluşturulmuş ve `linkedDriveId` içeren tekrarlar dahil edilmez. Manuel kayıtların tutarlılığı kullanıcıya bağlıdır.
+3. Uygun SOC/km verisi yoksa, tüketim modeli tarafından türetilen ve kaynağı belirtilen tüketim değeri veya en son **son şarjdan beri kWh/100 km** sayacı kullanılır. Bu yedek yöntem kapasite bilgisi gerektirir.
+
+### Hesap formülleri
+
+- **SOC/km temelli %100 eşdeğer menzil:** `100 × toplam uygun sürüş km / toplam SOC düşüşü (yüzde puanı)`.
+- **Tüketim temelli menzil:** `100 × kullanılabilir kapasite (kWh) / tüketim (kWh/100 km)`.
+- Kullanılabilir kapasite girilmemişse **88,5 kWh nominal kapasite ile kaba senaryo** gösterilir; bu net kullanılabilir enerji veya üretici gerçek menzil ölçümü değildir.
+- **Güncel SOC'den rezerv SOC'ye:** `%100 eşdeğer menzil × max(0, güncel SOC - rezerv SOC)/100`.
+- **%20–80 aralığı:** `%100 eşdeğer menzil × 0,60`.
+- **523 km WLTP karşılaştırması:** `(%100 eşdeğer menzil / 523 - 1) × 100`; WLTP ve gerçek kullanım koşulları aynı olmadığı için fark, batarya SOH kaybı anlamına gelmez.
+
+### Güvenilirlik
+
+Kaynak ve hesaplama varsayımları Dashboard kartında görünür. Birkaç sürüşten oluşturulan menzil tahmini sürüş hızı, klima/ısıtma, yokuş, hava ve sıcaklık değiştikçe anlamlı şekilde oynar. Bu değer BMS menzil değeri, SOH ölçümü veya garanti edilen mesafe değildir. Eksik veriler için `—` gösterilir; sahte menzil değeri üretilmez.
+
+### Yükleme
+
+v0.9.6 paketindeki **yeni `range-model.js`** dahil tüm dosyaları GitHub Pages deponuzun köküne koyun. Önce JSON yedeği alın. Yeni `wltpRangeKm` ayarı varsayılan 523 km olup Ayarlar'dan değiştirilebilir. Veri şeması 15'tir; önceki sürümlerin verileri korunur. Firebase kurallarının değiştirilmesi gerekmez. Service worker önbelleği `t10x-battery-v0.9.6-range` adını taşır.

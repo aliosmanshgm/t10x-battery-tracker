@@ -49,3 +49,11 @@
 - Song et al. (2023), [SOC/SOH referans test prosedürü](https://doi.org/10.1002/ese3.1581).
 - [Measurement of power loss during electric vehicle charging and discharging](https://doi.org/10.1016/j.energy.2017.03.015): Verim değişkenliği.
 - Deneysel aralıklar, şarj kayıp duyarlılık senaryolarını **kalibre etmiyor**. Senaryo aralıkları karar vericinin belirsizliği görmesi içindir.
+
+## v0.9.6 Ek İnceleme: Gerçek Kullanım Menzili
+
+- SOC tabanlı menzil, kaydedilmiş sürüş kilometresi ve SOC farkından türetilir; 88,5 kWh nominal kapasiteye ihtiyaç duymaz.
+- Kaydedilmiş şarj oturumu sürüş aralığına giriyorsa SOC/km hesabı atlanır. Eksik veya kısmi zaman kayıtları menzil tahminine kesin veri olarak girmez.
+- Bağımsız manuel yolculuklar ikinci seçimdir; Dashboard tarafından ayrıca türetilmiş yolculuklar (`linkedDriveId`) mükerrer sayılmaz.
+- Enerji/tüketim yedeği açıkça kapasite varsayımı olarak adlandırılır. Kullanılabilir batarya kapasitesi teyit edilmemişse nominal 88,5 kWh'yi tam kullanılabilir kabul etmek fiziksel olarak doğrulanmamıştır.
+- Menzil ile WLTP farkı batarya SOH ölçümü, üreticinin taahhüdünden sapma veya arıza teşhisi değildir.
