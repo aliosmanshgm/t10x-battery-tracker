@@ -1,4 +1,4 @@
-# T10X Batarya & Şarj Takip v0.9.7 — Akıllı Araç Paneli & Menzil Karşılaştırması
+# T10X Batarya & Şarj Takip v0.9.8 — Tahmini Menzil & Dönem Karşılaştırması
 
 Kişisel T10X (88,5 kWh NMC) kullanımı için local-first + Firebase senkronizasyonlu, iPhone/PWA uyumlu batarya ve şarj takip uygulaması.
 
@@ -173,3 +173,14 @@ v0.9.6 paketindeki **yeni `range-model.js`** dahil tüm dosyaları GitHub Pages 
 ### Kullanım
 
 `index.html`, `app.css`, `app.js`, `range-model.js`, `sw.js` dahil **ZIP içindeki tüm dosyaları** GitHub Pages depo köküne yükleyin. Önce mevcut uygulamadan JSON yedeği alın. Daha sonra iPhone Safari'de menzil kartı ile Dashboard hızlı girişini deneyin; varsa eski service worker güncellenmesi için sayfayı yeniden açın.
+
+
+## v0.9.8 — Menzil kartında bilimsel netlik ve son 90 gün
+
+- Dashboard kartı **“Kullanımıma Göre Tahmini Menzil”** olarak adlandırıldı. %100 SOC değeri gerçek test değil, %100 eşdeğeri tahmindir.
+- Sonucun SOC/km, tüketim veya ağırlıklı birleşik **senaryo** olduğu görünür biçimde açıklanır. WLTP farkının SOH olmadığı ayrıca belirtilir.
+- **Tüm kayıtlar / Son 90 gün** düğmeleri eklendi. Son 90 gün görünümü sadece tarihi bilinen yakın sürüşleri ve yakın tarihte kaydedilen tüketim sayacını içerir; eski sahiplik tüketimi yakın dönem verisi gibi kullanılmaz. Yeterli kayıt yoksa tahmin boş kalır.
+- Son uygun sürüşün tarihi ve kullanılan veri kapsamı gösterilir. Dönem seçimi geçicidir; Firebase'e, yerel veri dosyasına veya veri şemasına yeni alan yazılmaz.
+- Yeni veri alanı yoktur; eski Firebase kayıtları ve güvenlik kuralları korunur. Service worker cache: `t10x-battery-v0.9.8-range-clarity`.
+
+**Bilimsel not:** SOC/km menzili araç SOC göstergesine göre doğrusal %100 eşdeğeridir. Tüketim + nominal 88,5 kWh hesabı kullanılabilir kapasiteyi ölçmez. İki yöntemin ortak kaydı kullanması sebebiyle birleşik değer bağımsız doğrulama sayılmaz. Düşük sıcaklık/yüksek hız, WLTP farkı ve batarya yıpranması birbirinden ayrılmalıdır.

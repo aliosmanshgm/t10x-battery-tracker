@@ -40,7 +40,7 @@
       if (kmFromOdo !== null && km !== null && Math.abs(kmFromOdo - km) > Math.max(3, km * 0.05)) continue;
       if (hasChargeInside(start, end, charges)) continue;
       const segment = eligibleSegment(kmFromOdo !== null ? kmFromOdo : km, d.startSoc, d.endSoc);
-      if (segment) segments.push(segment);
+      if (segment) segments.push({ ...segment, observedAt:d.endAt });
     }
     return segments;
   }
@@ -51,7 +51,7 @@
       // Dashboard-generated trips are already counted in driveSessions.
       if (t.linkedDriveId) continue; // Other manual trips rely on user-entered start/end SOC; interim charging cannot be verified without timestamps.
       const segment = eligibleSegment(t.distance, t.startSoc, t.endSoc);
-      if (segment) segments.push(segment);
+      if (segment) segments.push({ ...segment, observedAt:t.date||null });
     }
     return segments;
   }
@@ -59,7 +59,9 @@
   function summarizeSegments(segments = []) {
     const km = segments.reduce((s, x) => s + x.km, 0);
     const drop = segments.reduce((s, x) => s + x.drop, 0);
-    return { km, drop, count: segments.length, range: km > 0 && drop > 0 ? km * 100 / drop : null };
+    const dated=segments.map(x=>Date.parse(x.observedAt||'')).filter(Number.isFinite);
+    const latestAt=dated.length?new Date(Math.max(...dated)).toISOString():null;
+    return { km, drop, count: segments.length, range: km > 0 && drop > 0 ? km * 100 / drop : null, latestAt };
   }
 
   function consumptionReference(consumptionMetrics, latestSnapshot) {

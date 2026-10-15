@@ -67,3 +67,12 @@
 - İki tahmin arasında %25'ten fazla sapma varsa otomatik ağırlıklı uzlaşım yapılmaz; uyuşmazlık görünür. %25 ve altındaki ağırlıklı değer **kalibre edilmiş menzil tahmini değildir**; algoritma bir yardımcı kestirimdir.
 - SOC örneklemi sınıfı ve kullanılan yolculuk sayısı gösterilir; aynı araç verilerine dayanan iki yönteme bağımsız ölçüm muamelesi yapılmaz.
 - Yerel hesaplama testleri ve Chromium önizleme testi yapılmıştır. Canlı Firebase hesabı ve iPhone Safari uçtan uca testi bu ortamda yapılmamıştır.
+
+
+## v0.9.8 — Menzil açıklığı ve dönem karşılaştırması
+
+- Ekran başlığı tahmini menzil olduğunu açıkça belirtiyor. WLTP farkı SOH olarak yorumlanmıyor.
+- Ağırlıklı birleşim yalnızca yaklaşımsal uzlaşım: SOC ve tüketim hesaplarında paylaşılan veriler olabileceği için bağımsız iki ölçüm olarak sunulmuyor.
+- Son 90 gün görünümü: tarihli tamamlanmış sürüşler, tarihli manuel yolculuklar ve tarihi uygun son tüketim kaydı; sahiplik dönemi enerji dengesi dışarıda. Birbirine karışan dönemlerin yanlış karşılaştırılmasını önler.
+- Son sürüş tarihi görünür; dönem veri olmadan sonuç uydurmuyor.
+- Mevcut kayıtlar, şema (15), servis işçisi kapsamı ve Firebase tek kullanıcı güvenliği korunuyor.

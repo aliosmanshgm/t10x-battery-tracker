@@ -596,6 +596,12 @@ function group(arr,keyFn,valueKey){const m={};for(const x of arr){const k=keyFn(
 function renderBars(id,obj,suffix=''){const el=byId(id);const entries=Object.entries(obj).sort((a,b)=>b[1]-a[1]);if(!entries.length){el.innerHTML='<div class="empty">Veri yok.</div>';return}const max=Math.max(...entries.map(x=>x[1]),1);el.innerHTML=entries.slice(0,8).map(([k,v])=>`<div class="bar-row"><div class="bar-label"><span>${escapeHtml(k)}</span><strong>${fmt(v,1)}${suffix}</strong></div><div class="bar-track"><div class="bar-fill" style="width:${v/max*100}%"></div></div></div>`).join('')}
 function renderBarsOrdered(id,obj,suffix=''){const el=byId(id),entries=Object.entries(obj);if(!entries.length){el.innerHTML='<div class="empty">Veri yok.</div>';return}const max=Math.max(...entries.map(x=>x[1]),1);el.innerHTML=entries.map(([k,v])=>`<div class="bar-row"><div class="bar-label"><span>${escapeHtml(k)}</span><strong>${fmt(v,1)}${suffix}</strong></div><div class="bar-track"><div class="bar-fill" style="width:${v/max*100}%"></div></div></div>`).join('')}
 
+// The view selection changes only the Dashboard presentation; it is never saved to Firebase.
+let rangePeriodView = 'all';
+function isInLastDays(value, days, now = Date.now()){
+  const stamp=Date.parse(value||'');
+  return Number.isFinite(stamp) && stamp <= now && stamp >= now - days*86400000;
+}
 function renderDashboard(){
   const c=ownerCharges(),soh=referenceSoh(),cons=latestConsumptionSnapshot(),cost100=costPer100Metrics(),life=lifetimeExposureMetrics();
   const energyTotal=sum(c.map(chargeEnergyValue)),dcEnergy=sum(c.filter(x=>x.type==='DC').map(chargeEnergyValue));
@@ -616,14 +622,22 @@ function renderDashboard(){
     ['Enerji Ağırlıklı Ortalama C-rate',cRateHistory.weightedAverage!=null?fmt(cRateHistory.weightedAverage,2)+'C':'—',weightedCRateDetail(cRateHistory)]
   ];
   byId('dashboardCards').innerHTML=cards.map(x=>`<div class="metric"><div class="label">${x[0]}</div><div class="value">${x[1]}</div><div class="sub">${x[2]}</div></div>`).join('');
-  // 523 km WLTP vs owner-specific evidence. This is a range scenario, not a BMS range reading.
+  // The 90-day view filters dated trips and measured snapshots. Ownership-wide
+  // consumption MUST NOT be quietly reused as a recent-period measurement.
+  // All charge sessions are passed to exclude charging within a drive interval.
+  const recentRange=rangePeriodView==='recent';
+  const relevantDrives=recentRange?db.driveSessions.filter(x=>isInLastDays(x.endAt,90)):db.driveSessions;
+  const relevantTrips=recentRange?db.trips.filter(x=>isInLastDays(x.date,90)):db.trips;
+  const relevantConsumption=recentRange?null:cost100.calculated;
+  const relevantSnapshot=recentRange?(cons&&isInLastDays(cons.date,90)?cons:null):cons;
+  // 523 km WLTP is an official reference, NOT a battery SOH yardstick.
   const range=window.T10XRange.estimate({
-    driveSessions:db.driveSessions,trips:db.trips,charges:ownerCharges(),
+    driveSessions:relevantDrives,trips:relevantTrips,charges:ownerCharges(),
     currentSoc:db.settings.currentSoc,reserveSoc:db.settings.plannerReserveSoc,
     nominalCapacity:db.settings.referenceCapacity,
     usableCapacity:db.settings.batteryUsableCapacity,
     wltpRangeKm:db.settings.wltpRangeKm,
-    consumptionMetrics:cost100.calculated,latestSnapshot:cons
+    consumptionMetrics:relevantConsumption,latestSnapshot:relevantSnapshot
   });
   const asKm=value=>value==null?'—':fmt(value,0)+' km';
   const pct=range.wltpDifference;
@@ -634,8 +648,15 @@ function renderDashboard(){
   const socPct=range.currentSoc;
   const socMeterValue=socPct===null?0:Math.max(0,Math.min(100,socPct));
   const socClass=socPct===null?'unknown':socPct<20?'low':socPct>80?'high':'normal';
-  const methodBadge=range.disagreement?'Tahminler uyuşmuyor':range.method==='combined'?'İki yöntem · senaryo':range.method==='none'?'Veri gerekiyor':'Tek yöntem';
-  rangeBox.innerHTML=`<div class="card-head range-title-head"><div><span class="cockpit-eyebrow">KULLANIM VERİLERİME GÖRE</span><h2>Gerçek Kullanım Menzilim</h2></div><span class="badge ${range.disagreement?'warn':'neutral'}">${escapeHtml(methodBadge)}</span></div>
+  const methodBadge=range.disagreement?'Tahminler uyuşmuyor':range.method==='combined'?'Birleşik senaryo':range.method==='none'?'Veri gerekiyor':range.method==='tracked-drive'||range.method==='manual-trip'?'SOC/km yöntemi':'Tüketim yöntemi';
+  const rangeMostRecent=range.sample?.latestAt?fmtDate(range.sample.latestAt):null;
+  const methodologyLabel=range.method==='combined'?'SOC/km ve tüketim tahminlerinin ağırlıklı uzlaşımı':range.method==='tracked-drive'||range.method==='manual-trip'?'Kayıtlı sürüşlerde kilometre ve SOC değişimi':range.method==='none'?'Geçerli ölçüm/kayıt henüz yok':'Tüketim ve kapasite varsayımına dayanan hesap';
+  rangeBox.innerHTML=`<div class="card-head range-title-head"><div><span class="cockpit-eyebrow">KİŞİSEL MENZİL ANALİZİ</span><h2>Kullanımıma Göre Tahmini Menzil</h2></div><span class="badge ${range.disagreement?'warn':'neutral'}">${escapeHtml(methodBadge)}</span></div>
+    <div class="range-period-selector" role="group" aria-label="Menzil hesaplama dönemi">
+      <button type="button" data-range-period="all" class="range-period-btn ${!recentRange?'active':''}" aria-pressed="${!recentRange}">Tüm kayıtlar</button>
+      <button type="button" data-range-period="recent" class="range-period-btn ${recentRange?'active':''}" aria-pressed="${recentRange}">Son 90 gün</button>
+    </div>
+    <p class="range-period-explain">${recentRange?'Yalnızca son 90 gündeki tarihli yolculuklar ve güncel tüketim sayacı kullanılır. Eski sahiplik ortalaması bu döneme aktarılmaz.':'Tüm uygun kayıtlar kullanılır; yaz ve kış koşulları aynı ortalamaya karışabilir.'}</p>
     <div class="range-overview">
       <div class="range-primary"><span>%100 SOC eşdeğeri · tahmini</span><strong>${asKm(range.fullRange)}</strong><small>${escapeHtml(methodTitle)}</small></div>
       <div class="range-metrics">
@@ -649,13 +670,16 @@ function renderDashboard(){
     </div>
     <div class="range-benchmark"><div class="range-benchmark-label"><span>WLTP referansı: <strong>${range.wltpRangeKm!=null?fmt(range.wltpRangeKm,0)+' km':'—'}</strong></span><strong>${escapeHtml(difference)}</strong></div>
       <div class="range-track"><span style="width:${progress.toFixed(1)}%"></span></div></div>
-    <p class="range-source"><strong>Veri kapsamı:</strong> ${escapeHtml(range.evidenceGrade)}${range.disagreement?' · hesapları karşılaştırın':''}</p>
+    <div class="range-evidence-note"><strong>Hesaplama dayanağı:</strong> ${escapeHtml(methodologyLabel)}<br><strong>Veri kapsamı:</strong> ${escapeHtml(range.evidenceGrade)}${rangeMostRecent?' · Son uygun sürüş: '+escapeHtml(rangeMostRecent):''}${range.disagreement?' · tahminler arasında belirgin fark var':''}</div>
+    ${recentRange&&range.method==='none'?'<p class="range-missing">Son 90 güne ait yeterli sürüş/SOC veya tüketim verisi yok. Tüm Kayıtlar seçeneğini kullanabilir ya da yeni sürüş kaydedebilirsiniz.</p>':''}
     <p class="muted">${escapeHtml(range.note)}</p>
     <details class="range-details"><summary>Yöntem, veri kapsamı ve sınırlamalar</summary>
       <p><strong>Km/SOC:</strong> Şarj yapılmamış kayıtlarda km × 100 / SOC puan düşüşü. ${escapeHtml(range.socEvidence||'Yeterli örnek yok')}.</p>
       <p><strong>Tüketim:</strong> 100 × kapasite kWh / tüketim kWh/100 km. ${escapeHtml(range.consumptionEvidence||'Hesaplanamıyor')}.</p>
-      <p><strong>Birleşik gösterge:</strong> İki tahmin %25 içinde kalıyorsa SOC/km verisine daha yüksek ağırlık veren açıklanabilir bir uzlaşım gösterilir. Veriler aynı sürüşlere dayanabileceği için iki bağımsız test sayılmaz. Fark %25'i aşarsa birleşim uygulanmaz.</p>
-      <p><strong>Güncel rezerv:</strong> %100 eşdeğeri × (güncel SOC − seçilen rezerv)/100. %20–80 bandı %60'ıdır. Araçtan canlı veri, BMS SOH veya gerçek kullanılabilir kapasite otomatik alınmıyor. Mevsim, sıcaklık, sürüş hızı, yol eğimi ve klima sonuçları değiştirebilir.</p>
+      <p><strong>Birleşik senaryo:</strong> İki tahmin birbirinden en fazla %25 ayrılıyorsa, SOC/km verisine daha yüksek ağırlık verilir. Bu sonuç iki bağımsız ölçümün doğrulaması değildir; aynı sürüş verileri iki hesapta da yer alabilir. Fark %25’i aşarsa SOC/km tahmini ayrı gösterilir ve uyuşmazlık belirtilir.</p>
+      <p><strong>Son 90 gün görünümü:</strong> Tarihli sürüşler ve son şarjdan beri tüketim sayacı dikkate alınır. Ömür boyu enerji dengesi veya tarih atanmamış eski yolculuklar bu döneme dahil edilmez. Dönemler arasında yalnızca farklı örneklemler karşılaştırılır.</p>
+      <p><strong>Güncel rezerv:</strong> %100 eşdeğeri × (güncel SOC − seçilen rezerv)/100. %20–80 bandı %60'ıdır. Bu menzil güvenli erişim garantisi değildir. Gelecekteki sıcaklık, hız, eğim, klima ve beklenmedik tüketim sonucu değiştirebilir.</p>
+      <p><strong>WLTP karşılaştırması:</strong> 523 km, standart test çevriminin referansıdır. Yüzde farkı bataryanın SOH/kaybı anlamına gelmez. Araçtan canlı OBD verisi veya kullanılabilir kapasite otomatik alınmaz.</p>
     </details>`;
 
   const odoText=latestOdo()!=null?fmt(latestOdo(),0)+' km':'—';
@@ -1189,6 +1213,14 @@ D.clearAllBtn.onclick=()=>{if(confirm('Tüm kayıtlar kalıcı olarak silinecek.
 
 function showTab(id){document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.tab===id));document.querySelectorAll('.panel').forEach(x=>x.classList.toggle('active',x.id===id));if(id==='crate')renderCrate();if(id==='planner')renderPlanner()}
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
+// Event delegation survives every Dashboard re-render. The view is temporary, no data is overwritten.
+byId('rangeDashboard').addEventListener('click',e=>{
+  const button=e.target.closest('button[data-range-period]');
+  if(!button||!byId('rangeDashboard').contains(button))return;
+  const next=button.dataset.rangePeriod;
+  if(next!=='all'&&next!=='recent')return;
+  if(rangePeriodView!==next){rangePeriodView=next;renderDashboard();}
+});
 byId('jumpToQuickStatus').onclick=()=>{showTab('dashboard');byId('quickCurrentOdo').scrollIntoView({behavior:'smooth',block:'center'});byId('quickCurrentOdo').focus({preventScroll:true});};document.querySelectorAll('[data-goto]').forEach(b=>b.onclick=()=>showTab(b.dataset.goto));
 
 function download(name,text,type='text/plain'){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();URL.revokeObjectURL(a.href)}
