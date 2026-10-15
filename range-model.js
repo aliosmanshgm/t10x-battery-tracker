@@ -1,4 +1,4 @@
-/* T10X v0.9.6 - Observed SOC-distance range and labelled consumption scenarios.
+/* T10X v0.9.7 - SOC/km + consumption range scenarios and transparent comparison.
    No odometer/SOC measurement is fabricated. Nominal capacity is not assumed usable. */
 (function (root, factory) {
   const api = factory();
@@ -11,9 +11,9 @@
 
   function eligibleSegment(distance, startSoc, endSoc) {
     const km = num(distance), start = num(startSoc), end = num(endSoc);
-    if (!(km >= 20) || !validSoc(startSoc) || !validSoc(endSoc)) return null;
+    if (!(km >= 30) || !validSoc(startSoc) || !validSoc(endSoc)) return null;
     const drop = start - end;
-    if (drop < 4) return null; // Integer SOC steps distort short samples.
+    if (drop < 8) return null; // >=8 SOC points to limit integer-SOC quantization errors.
     const fullRange = 100 * km / drop;
     if (!(fullRange >= 100 && fullRange <= 1000)) return null;
     return { km, drop, fullRange };
@@ -49,7 +49,7 @@
     const segments = [];
     for (const t of trips) {
       // Dashboard-generated trips are already counted in driveSessions.
-      if (t.linkedDriveId) continue;
+      if (t.linkedDriveId) continue; // Other manual trips rely on user-entered start/end SOC; interim charging cannot be verified without timestamps.
       const segment = eligibleSegment(t.distance, t.startSoc, t.endSoc);
       if (segment) segments.push(segment);
     }
@@ -95,18 +95,44 @@
     const consumption = consumptionReference(consumptionMetrics, latestSnapshot);
     const usable = num(usableCapacity), nominal = num(nominalCapacity), wltp = num(wltpRangeKm);
     const batteryKwh = usable !== null && usable > 0 ? usable : nominal;
+    const socRange = sample.count && sample.range ? sample.range : null;
+    const consumptionRange = consumption && batteryKwh > 0 ? batteryKwh * 100 / consumption.value : null;
+    const consumptionBasis = usable !== null && usable > 0 ? 'usable' : 'nominal';
+    const consumptionMethod = consumptionBasis === 'usable' ? 'consumption-usable' : 'consumption-nominal';
     let fullRange = null, method = 'none', label = 'Hesap için yeterli kayıt yok';
-    let evidence = '';
-    if (sample.count && sample.range) {
-      fullRange = sample.range;
+    let evidence = '', disagreement = false, combinedWeights = null;
+    const socEvidence = sample.count ? `${sample.count} yolculuk · ${sample.km.toFixed(0)} km · %${sample.drop.toFixed(0)} SOC düşüşü` : '';
+    const consumptionEvidence = consumption ? `${consumption.value.toFixed(1)} kWh/100 km · ${batteryKwh.toFixed(1)} kWh ${consumptionBasis === 'nominal' ? 'nominal kapasite varsayımı' : 'girilmiş kullanılabilir kapasite'}` : '';
+    const socLabel = source === 'tracked-drive' ? 'Sürüş km/SOC kayıtları' : 'Elle girilmiş yolculuk km/SOC kayıtları';
+    if (socRange !== null && consumptionRange !== null) {
+      // These estimators can share source trips: a heuristic consensus is NOT an independent validation.
+      const relativeGap = Math.abs(socRange - consumptionRange) / ((socRange + consumptionRange) / 2);
+      disagreement = relativeGap > 0.25;
+      if (disagreement) {
+        fullRange = socRange;
+        method = source;
+        label = `${socLabel} (tüketim tahminiyle belirgin uyuşmazlık)`;
+        evidence = socEvidence;
+      } else {
+        // Prefer direct SOC/distance observations. Nominal battery capacity is never treated as observed usable energy.
+        const wSoc = Math.min(0.85, Math.max(0.65, 0.65 + Math.min(sample.km, 500) / 2500)) ;
+        const socWeight = consumptionBasis === 'nominal' ? Math.max(0.80, wSoc) : wSoc;
+        fullRange = socRange * socWeight + consumptionRange * (1 - socWeight);
+        combinedWeights = { soc: socWeight, consumption: 1 - socWeight };
+        method = 'combined';
+        label = `${socLabel} + ${consumption.label} (yaklaşık uzlaşım)`;
+        evidence = `${socEvidence} · ${consumptionEvidence}`;
+      }
+    } else if (socRange !== null) {
+      fullRange = socRange;
       method = source;
-      label = source === 'tracked-drive' ? 'Sürüşün km ve SOC değişimi' : 'Elle girilmiş yolculuk km/SOC kayıtları';
-      evidence = `${sample.count} yolculuk · ${sample.km.toFixed(0)} km · toplam %${sample.drop.toFixed(0)} SOC düşüşü`;
-    } else if (consumption && batteryKwh > 0) {
-      fullRange = batteryKwh * 100 / consumption.value;
-      method = usable !== null && usable > 0 ? 'consumption-usable' : 'consumption-nominal';
+      label = socLabel;
+      evidence = socEvidence;
+    } else if (consumptionRange !== null) {
+      fullRange = consumptionRange;
+      method = consumptionMethod;
       label = consumption.label;
-      evidence = `${consumption.value.toFixed(1)} kWh/100 km · ${batteryKwh.toFixed(1)} kWh ${method === 'consumption-nominal' ? 'nominal referans (kullanılabilir kapasite değil)' : 'kullanılabilir kapasite girdisi'}`;
+      evidence = consumptionEvidence;
     }
     const soc = validSoc(currentSoc) ? Number(currentSoc) : null;
     const reserve = num(reserveSoc);
@@ -115,22 +141,30 @@
     const remainingToZero = fullRange !== null && soc !== null ? fullRange * soc / 100 : null;
     const band20to80 = fullRange !== null ? fullRange * 0.60 : null;
     const wltpDifference = fullRange !== null && wltp !== null && wltp > 0 ? (fullRange / wltp - 1) * 100 : null;
-    const evidenceGrade = method === 'tracked-drive' || method === 'manual-trip'
-      ? (sample.km >= 250 && sample.drop >= 40 ? 'Geniş örneklem' : sample.km >= 100 && sample.drop >= 15 ? 'Orta örneklem' : 'Sınırlı örneklem')
-      : method === 'consumption-nominal' ? 'Nominal kapasite varsayımı' : method === 'consumption-usable' ? 'Kapasite ve tüketim varsayımı' : 'Veri eksik';
+    const sampleGrade = sample.km >= 250 && sample.drop >= 40 ? 'Geniş SOC örneklemi' : sample.km >= 100 && sample.drop >= 15 ? 'Orta SOC örneklemi' : 'Sınırlı SOC örneklemi';
+    const evidenceGrade = method === 'combined' ? sampleGrade + ' · senaryo birleşimi'
+      : method === 'tracked-drive' || method === 'manual-trip' ? sampleGrade
+      : method === 'consumption-nominal' ? 'Nominal kapasite varsayımı'
+      : method === 'consumption-usable' ? 'Kapasite girdisine bağlı' : 'Veri eksik';
     return {
       fullRange, remainingToReserve, remainingToZero, band20to80, wltpDifference,
       wltpRangeKm: wltp, currentSoc: soc, reserveSoc: reserve,
       method, label, evidence, evidenceGrade, sample,
       tracked, manual, consumption, capacityKwh: batteryKwh,
-      nominalAssumption: method === 'consumption-nominal',
-      note: method === 'tracked-drive' || method === 'manual-trip'
-        ? 'SOC farkı, gösterge yuvarlaması, sıcaklık, sürüş biçimi ve batarya yönetimi nedeniyle tahmindir. Bir şarj oturumu araya giren kayıtlı sürüşler dahil edilmez.'
-        : method === 'consumption-nominal'
-          ? '88,5 kWh nominal kapasitenin tamamı kullanılabilir kabul edilemez. Bu sonuç gerçek menzil ölçümü değildir; iyimser olabilir.'
-          : method === 'consumption-usable'
-            ? 'Kullanılabilir kapasite girdinizin doğruluğuna ve tüketimin temsil gücüne bağlı senaryo hesabıdır.'
-            : 'Yeterli sürüş km/SOC kaydı veya tüketim ortalaması girin.'
+      socRange, socEvidence, consumptionRange, consumptionEvidence, consumptionBasis,
+      combinedWeights, disagreement,
+      nominalAssumption: consumptionBasis === 'nominal' && consumptionRange !== null,
+      note: disagreement
+        ? 'SOC/km ve tüketim hesapları %25’ten fazla ayrışıyor. Yapay kesinlikten kaçınmak için SOC/km tahmini esas alındı; girişleri ve koşulları kontrol edin.'
+        : method === 'combined'
+          ? 'İki tahmin örtüşüyor; gösterilen uzlaşım ağırlıklı bir senaryodur, bağımsız doğrulama veya gerçek BMS menzil ölçümü değildir. Nominal kapasite bilinmeyen kullanılabilir kapasitenin yerine geçmez.'
+          : method === 'tracked-drive' || method === 'manual-trip'
+            ? 'SOC yüzdesi gösterge yuvarlamasına, hava, sürüş profili ve bataryanın termal durumuna duyarlıdır; %100’e şarj edilmiş menzil testi değildir. Manuel yolculuklarda arada şarj olmadığının kontrolü kullanıcıya aittir.'
+            : method === 'consumption-nominal'
+              ? '88,5 kWh nominal kapasitenin tamamı kullanılabilir değildir; sonuç kapasiteye bağlı kaba ve potansiyel olarak iyimser senaryodur.'
+              : method === 'consumption-usable'
+                ? 'Girdiğiniz kullanılabilir kapasiteye ve tüketim kaydının temsil gücüne bağlı senaryo hesabıdır.'
+                : 'Km/SOC içeren sürüş veya kWh/100 km tüketim kaydı girin.'
     };
   }
   return { estimate, observedDriveSegments, observedManualSegments, summarizeSegments, consumptionReference };

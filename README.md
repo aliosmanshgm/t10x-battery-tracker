@@ -1,4 +1,4 @@
-# T10X Batarya & Şarj Takip v0.9.6 — SOH Evidence & Audit
+# T10X Batarya & Şarj Takip v0.9.7 — Akıllı Araç Paneli & Menzil Karşılaştırması
 
 Kişisel T10X (88,5 kWh NMC) kullanımı için local-first + Firebase senkronizasyonlu, iPhone/PWA uyumlu batarya ve şarj takip uygulaması.
 
@@ -156,3 +156,20 @@ Kaynak ve hesaplama varsayımları Dashboard kartında görünür. Birkaç sür�
 ### Yükleme
 
 v0.9.6 paketindeki **yeni `range-model.js`** dahil tüm dosyaları GitHub Pages deponuzun köküne koyun. Önce JSON yedeği alın. Yeni `wltpRangeKm` ayarı varsayılan 523 km olup Ayarlar'dan değiştirilebilir. Veri şeması 15'tir; önceki sürümlerin verileri korunur. Firebase kurallarının değiştirilmesi gerekmez. Service worker önbelleği `t10x-battery-v0.9.6-range` adını taşır.
+
+
+## v0.9.7 — Akıllı Araç Paneli ve menzil karşılaştırması
+
+- Dashboard üst kısmında ekran görüntüsünden esinlenilmiş, **gerçek kayıtlardan beslenen** iPhone uyumlu panel: mevcut SOC çubuğu (%20–80 işaretli), odometre, rezervli menzil, son şarjdan beri tüketim sayacı ve yalnız doğrulanmış SOH kaydı.
+- **OBD/BMS canlı bağlantısı mevcut değildir**; doğrudan OBD akımı, gerçek paket sıcaklığı, SOH ya da hücre voltajı üretilmez. Örnek ekran görüntüsünün canlı OBD verileri taklit edilmez.
+- Tek dokunuşla Durum/Sürüş Gir, Şarj Kaydı, Şarj Planla. Günlük hızlı veri girişi, menzil kartının hemen altında; uzun teknik gösterge listesi açılır bölümde.
+- `range-model.js` artık birbirinden ayrı **km/SOC eşdeğer menzili** ve **tüketim/kapasite eşdeğer menzili** hesaplayıp yan yana gösterir. İlki, en az 30 km ve 8 SOC puanı değişen, arada kayıtlı şarj olmayan sürüşleri kullanır. Otomatik sürüş kaydı varsa ayrıca eklenen manuel sürüşler aynı havuza katılarak çift sayılmaz. Manuel kayıtlarda arada şarj olmaması kullanıcı kontrolüne bağlıdır.
+- İki hesap arasındaki fark göreli %25 içinde ise SOC/km tahminine **en az %80**, nominal kapasite senaryosuna en fazla %20 ağırlık veren **yaklaşık uzlaşım** hesaplanır. Doğrulanmış kullanılabilir kapasite girdisinde SOC ağırlığı örnekleme göre %65–85 olur. Bu algoritma bilimsel olarak kalibre edilmiş kapasite kestiricisi değildir; iki tahmin aynı yolculuklardan türeyebilir, dolayısıyla bağımsız ölçüm sayılmaz.
+- Uyuşmazlık >%25 olduğunda uzlaşım yapılmaz; SOC/km eşdeğer tahmini ana kartta korunur, tüketim senaryosu ayrı gösterilir ve uyuşmazlık belirtilir.
+- Kullanılabilir kapasite bilinmiyorsa 88,5 kWh nominal paket enerjisi yalnızca **iyimser olabilen senaryo** olarak kullanılır. `%100 SOC eşdeğeri` %100'e gerçekten şarj edilerek test edilmiş menzil değildir.
+- Rezervli menzil, %20–80 aralığı ve 523 km WLTP farkı ayrıdır; WLTP laboratuvar koşullarıyla gerçek kullanım birebir karşılaştırılmaz.
+- Mevcut Firebase yapılandırması, tek kullanıcılı RTDB kuralları, JSON yedekleme, şarj geçmişi ve `schemaVersion:15` değişmedi. `sw.js` önbellek sürümü `t10x-battery-v0.9.7-cockpit` oldu.
+
+### Kullanım
+
+`index.html`, `app.css`, `app.js`, `range-model.js`, `sw.js` dahil **ZIP içindeki tüm dosyaları** GitHub Pages depo köküne yükleyin. Önce mevcut uygulamadan JSON yedeği alın. Daha sonra iPhone Safari'de menzil kartı ile Dashboard hızlı girişini deneyin; varsa eski service worker güncellenmesi için sayfayı yeniden açın.

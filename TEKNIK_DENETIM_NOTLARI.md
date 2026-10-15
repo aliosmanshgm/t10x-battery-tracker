@@ -57,3 +57,13 @@
 - Bağımsız manuel yolculuklar ikinci seçimdir; Dashboard tarafından ayrıca türetilmiş yolculuklar (`linkedDriveId`) mükerrer sayılmaz.
 - Enerji/tüketim yedeği açıkça kapasite varsayımı olarak adlandırılır. Kullanılabilir batarya kapasitesi teyit edilmemişse nominal 88,5 kWh'yi tam kullanılabilir kabul etmek fiziksel olarak doğrulanmamıştır.
 - Menzil ile WLTP farkı batarya SOH ölçümü, üreticinin taahhüdünden sapma veya arıza teşhisi değildir.
+
+
+## v0.9.7 — Menzil modeli ve arayüz denetimi
+
+- Gönderilen görseldeki canlı OBD verilerini taklit etmek yerine, yalnız kullanıcı kayıtlarına dayanan SOC, kilometre, tüketim ve doğrulanmış SOH kullanıldı.
+- SOC/km hesabında 30 km altı ve 8 SOC puanı altı seanslar, şarjla çakışan otomatik seanslar, mantıksız ve zamansal açıdan geçersiz seanslar hariç. Manuel yolculukların arada şarj olmaması kullanıcı tarafından doğrulanmalı.
+- Tüketim/kapasite hesabında 88,5 kWh nominal referans, gerçek kullanılabilir enerji olarak sunulmaz.
+- İki tahmin arasında %25'ten fazla sapma varsa otomatik ağırlıklı uzlaşım yapılmaz; uyuşmazlık görünür. %25 ve altındaki ağırlıklı değer **kalibre edilmiş menzil tahmini değildir**; algoritma bir yardımcı kestirimdir.
+- SOC örneklemi sınıfı ve kullanılan yolculuk sayısı gösterilir; aynı araç verilerine dayanan iki yönteme bağımsız ölçüm muamelesi yapılmaz.
+- Yerel hesaplama testleri ve Chromium önizleme testi yapılmıştır. Canlı Firebase hesabı ve iPhone Safari uçtan uca testi bu ortamda yapılmamıştır.

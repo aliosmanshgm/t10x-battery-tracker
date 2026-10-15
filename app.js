@@ -629,27 +629,52 @@ function renderDashboard(){
   const pct=range.wltpDifference;
   const difference=pct==null?'—':`${pct>0?'+':''}${fmt(pct,1)}%`;
   const progress=pct==null?0:Math.max(0,Math.min(100,range.fullRange/range.wltpRangeKm*100));
-  const methodTitle=range.method==='tracked-drive'?'Sürüş kaydından hesap':range.method==='manual-trip'?'Yolculuk SOC/km verisinden hesap':range.method==='consumption-nominal'?'Nominal kapasiteyle kaba tahmin':range.method==='consumption-usable'?'Kapasite + tüketim senaryosu':'Tüketim verisiyle tahmin';
+  const methodTitle=range.method==='combined'?'SOC/km + tüketim uzlaşımı':range.method==='tracked-drive'?'Sürüş km/SOC ölçümleri':range.method==='manual-trip'?'Yolculuk km/SOC ölçümleri':range.method==='consumption-nominal'?'Nominal kapasiteyle kaba tahmin':range.method==='consumption-usable'?'Kullanılabilir kapasite senaryosu':'Hesap için kayıt eksik';
   const rangeBox=byId('rangeDashboard');
-  rangeBox.innerHTML=`<div class="card-head"><h2>Kullanımıma Göre Tahmini Menzil</h2><span class="badge neutral">${escapeHtml(range.evidenceGrade)}</span></div>
+  const socPct=range.currentSoc;
+  const socMeterValue=socPct===null?0:Math.max(0,Math.min(100,socPct));
+  const socClass=socPct===null?'unknown':socPct<20?'low':socPct>80?'high':'normal';
+  const methodBadge=range.disagreement?'Tahminler uyuşmuyor':range.method==='combined'?'İki yöntem · senaryo':range.method==='none'?'Veri gerekiyor':'Tek yöntem';
+  rangeBox.innerHTML=`<div class="card-head range-title-head"><div><span class="cockpit-eyebrow">KULLANIM VERİLERİME GÖRE</span><h2>Gerçek Kullanım Menzilim</h2></div><span class="badge ${range.disagreement?'warn':'neutral'}">${escapeHtml(methodBadge)}</span></div>
     <div class="range-overview">
-      <div class="range-primary"><span>%100 SOC karşılığı · ${escapeHtml(methodTitle)}</span><strong>${asKm(range.fullRange)}</strong><small>WLTP referansı ${fmt(range.wltpRangeKm,0)} km · aynı test koşulları değildir</small></div>
+      <div class="range-primary"><span>%100 SOC eşdeğeri · tahmini</span><strong>${asKm(range.fullRange)}</strong><small>${escapeHtml(methodTitle)}</small></div>
       <div class="range-metrics">
-        <div><span>Güncel %${range.currentSoc==null?'—':fmt(range.currentSoc,0)} SOC → %${fmt(range.reserveSoc,0)} rezerv</span><strong>${asKm(range.remainingToReserve)}</strong></div>
-        <div><span>%20–80 SOC arasında</span><strong>${asKm(range.band20to80)}</strong></div>
+        <div><span>Şu an → %${fmt(range.reserveSoc,0)} rezerv</span><strong>${asKm(range.remainingToReserve)}</strong><small>Mevcut %${socPct===null?'—':fmt(socPct,0)} SOC'den</small></div>
+        <div><span>%20–80 koruma bandı</span><strong>${asKm(range.band20to80)}</strong><small>60 SOC puanlık kullanım</small></div>
       </div>
     </div>
-    <div class="range-benchmark"><div class="range-benchmark-label"><span>WLTP referans menzili: <strong>${fmt(range.wltpRangeKm,0)} km</strong></span><strong>${escapeHtml(difference)}</strong></div>
+    <div class="range-method-compare">
+      <div><span>Km + SOC gözlemi</span><strong>${asKm(range.socRange)}</strong><small>${range.socEvidence?escapeHtml(range.socEvidence):'Uygun sürüş kaydı bekleniyor'}</small></div>
+      <div><span>Tüketim + kapasite</span><strong>${asKm(range.consumptionRange)}</strong><small>${range.consumptionEvidence?escapeHtml(range.consumptionEvidence):'Ortalama tüketim kaydı bekleniyor'}</small></div>
+    </div>
+    <div class="range-benchmark"><div class="range-benchmark-label"><span>WLTP referansı: <strong>${range.wltpRangeKm!=null?fmt(range.wltpRangeKm,0)+' km':'—'}</strong></span><strong>${escapeHtml(difference)}</strong></div>
       <div class="range-track"><span style="width:${progress.toFixed(1)}%"></span></div></div>
-    <p class="range-source"><strong>Hesap kaynağı:</strong> ${escapeHtml(range.label)}${range.evidence?' · '+escapeHtml(range.evidence):''}</p>
+    <p class="range-source"><strong>Veri kapsamı:</strong> ${escapeHtml(range.evidenceGrade)}${range.disagreement?' · hesapları karşılaştırın':''}</p>
     <p class="muted">${escapeHtml(range.note)}</p>
-    <details class="range-details"><summary>Menzili nasıl hesaplıyoruz?</summary>
-      <p><strong>Km + SOC verisi varsa:</strong> Şarj yapılmamış sürüşlerde toplam km × 100 / toplam SOC düşüşü. Kullanılan gözlem: ${escapeHtml(range.tracked.count+' doğrulanmış sürüş; '+range.manual.count+' bağımsız manuel yolculuk')}.</p>
-      <p><strong>Yoksa tüketimden:</strong> 100 × kapasite (kWh) / tüketim (kWh/100 km). Bilinen kullanılabilir kapasite girilmediyse 88,5 kWh nominal referans kullanılır; bu gerçek kullanılabilir enerji değildir.</p>
-      <p><strong>Rezervli menzil:</strong> %100 eşdeğer menzil × (güncel SOC − rezerv SOC) / 100. 20–80 penceresi eşdeğer menzilin %60'ıdır. Trafik, Ankara hava koşulları, hız, ısıtma/klima, lastikler ve batarya sıcaklığı sonucu değiştirebilir.</p>
-      <p>Eksik SOC, çok kısa sürüş, mantıksız km/SOC değişimi veya kayıtta şarj bulunduğu tespit edilen sürüşler doğrudan SOC hesabına katılmaz. Sonuç otomobilin BMS menzil göstergesi değil, kayıtlarınızın yaklaşık yorumudur.</p>
+    <details class="range-details"><summary>Yöntem, veri kapsamı ve sınırlamalar</summary>
+      <p><strong>Km/SOC:</strong> Şarj yapılmamış kayıtlarda km × 100 / SOC puan düşüşü. ${escapeHtml(range.socEvidence||'Yeterli örnek yok')}.</p>
+      <p><strong>Tüketim:</strong> 100 × kapasite kWh / tüketim kWh/100 km. ${escapeHtml(range.consumptionEvidence||'Hesaplanamıyor')}.</p>
+      <p><strong>Birleşik gösterge:</strong> İki tahmin %25 içinde kalıyorsa SOC/km verisine daha yüksek ağırlık veren açıklanabilir bir uzlaşım gösterilir. Veriler aynı sürüşlere dayanabileceği için iki bağımsız test sayılmaz. Fark %25'i aşarsa birleşim uygulanmaz.</p>
+      <p><strong>Güncel rezerv:</strong> %100 eşdeğeri × (güncel SOC − seçilen rezerv)/100. %20–80 bandı %60'ıdır. Araçtan canlı veri, BMS SOH veya gerçek kullanılabilir kapasite otomatik alınmıyor. Mevsim, sıcaklık, sürüş hızı, yol eğimi ve klima sonuçları değiştirebilir.</p>
     </details>`;
 
+  const odoText=latestOdo()!=null?fmt(latestOdo(),0)+' km':'—';
+  const latestUpdateDate=db.settings.currentSocUpdatedAt||db.socSnapshots?.at(-1)?.date||'';
+  const lastText=latestUpdateDate?fmtDate(latestUpdateDate):'Kayıt zamanı bilinmiyor';
+  byId('cockpitLastUpdate').textContent=`Son SOC kaydı: ${lastText}`;
+  const displaySince=cons&&Number(cons.sinceCharge)>0?fmt(cons.sinceCharge,1):'—';
+  const sohText=soh?'%'+fmt(soh.soh,1):'—';
+  const gaugeLabel=socPct!==null?'%'+fmt(socPct,0):'—';
+  byId('cockpitLiveMetrics').innerHTML=`
+    <div class="cockpit-soc-block"><div class="cockpit-block-top"><span>BATARYA DOLULUĞU (SOC)</span><strong>${gaugeLabel}</strong></div>
+      <div class="soc-progress"><div class="soc-safe-band"></div><div class="soc-level ${socClass}" style="width:${socMeterValue}%"></div><i style="left:${socMeterValue}%"></i></div>
+      <div class="soc-scale"><span>%0</span><span>Önerilen %20–80</span><span>%100</span></div></div>
+    <div class="cockpit-live-grid">
+      <div class="cockpit-tile"><span>Kilometre</span><strong>${odoText}</strong><small>Son kullanıcı kaydı</small></div>
+      <div class="cockpit-tile"><span>Kalan menzil</span><strong>${asKm(range.remainingToReserve)}</strong><small>%${fmt(range.reserveSoc,0)} rezerve kadar · tahmini</small></div>
+      <div class="cockpit-tile"><span>Son şarjdan beri</span><strong>${displaySince}${displaySince==='—'?'':' kWh/100'}</strong><small>Araç tüketim sayacı</small></div>
+      <div class="cockpit-tile"><span>SOH / Kapasite</span><strong>${sohText}</strong><small>${soh?(soh.method==='bms'?'BMS/servis beyanı':'Net enerji temelli kestirim'):'SOH kaydı yok'}</small></div>
+    </div>`;
 
   const hs=batteryHealthScore();
   byId('healthScoreValue').textContent=hs.score==null?'—':fmt(hs.score,0);
@@ -1163,7 +1188,8 @@ D.providerResetBtn.onclick=()=>{if(confirm('Sağlayıcı listesi varsayılan lis
 D.clearAllBtn.onclick=()=>{if(confirm('Tüm kayıtlar kalıcı olarak silinecek. Emin misiniz?')){db=structuredClone(defaults);save()}};
 
 function showTab(id){document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.tab===id));document.querySelectorAll('.panel').forEach(x=>x.classList.toggle('active',x.id===id));if(id==='crate')renderCrate();if(id==='planner')renderPlanner()}
-document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));document.querySelectorAll('[data-goto]').forEach(b=>b.onclick=()=>showTab(b.dataset.goto));
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
+byId('jumpToQuickStatus').onclick=()=>{showTab('dashboard');byId('quickCurrentOdo').scrollIntoView({behavior:'smooth',block:'center'});byId('quickCurrentOdo').focus({preventScroll:true});};document.querySelectorAll('[data-goto]').forEach(b=>b.onclick=()=>showTab(b.dataset.goto));
 
 function download(name,text,type='text/plain'){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();URL.revokeObjectURL(a.href)}
 D.exportJsonBtn.onclick=()=>download(`t10x_batarya_yedek_${new Date().toISOString().slice(0,10)}.json`,JSON.stringify(db,null,2),'application/json');

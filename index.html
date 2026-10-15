@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="T10X Batarya" />
   <meta name="mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="manifest.webmanifest" />
-  <title>T10X Batarya & Şarj Takip v0.9.6 · Premium / Apple · Charge Planner</title>
+  <title>T10X Batarya & Şarj Takip v0.9.7 · Akıllı Araç Paneli</title>
   <link rel="stylesheet" href="app.css" />
 </head>
 <body>
@@ -62,8 +62,50 @@
 
   <main>
     <section id="dashboard" class="panel active">
-      <div class="cards" id="dashboardCards"></div>
+      <section class="cockpit-head" aria-label="Araç genel görünümü">
+        <div class="cockpit-title"><div><span class="cockpit-eyebrow">T10X · KİŞİSEL ARAÇ PANELİ</span><h2>Aracımın durumu</h2><p>Girilen kayıtlardan oluşturulan özet · canlı OBD bağlantısı değildir</p></div><span class="cockpit-type">NMC · 88,5 kWh nominal</span></div>
+        <div id="cockpitLiveMetrics" class="cockpit-live" aria-live="polite"></div>
+        <div class="cockpit-quick-actions">
+          <button type="button" class="cockpit-action primary" id="jumpToQuickStatus">＋ Durum / Sürüş Gir</button>
+          <button type="button" class="cockpit-action" data-goto="charges">⚡ Şarj Kaydı</button>
+          <button type="button" class="cockpit-action" data-goto="planner">◷ Şarj Planla</button>
+        </div>
+        <div class="cockpit-source-line"><span><i></i> Kayıtlı bilgiler</span><span id="cockpitLastUpdate">Son giriş: —</span><span>OBD verisi bağlı değil</span></div>
+      </section>
       <article class="card range-dashboard-card" id="rangeDashboard" aria-live="polite"></article>
+      <div class="grid two">
+        <article class="card consumption-card">
+          <div class="card-head"><h2>Ortalama Tüketim</h2><button type="button" class="link-btn" onclick="document.getElementById('quickCurrentOdo').focus()">Hızlı Kayıt</button></div>
+          <div id="consumptionSummary"></div>
+          <details class="ledger-details">
+            <summary>Toplam tüketimi nasıl hesaplıyoruz?</summary>
+            <label class="checkbox-label"><input id="chargeLedgerComplete" type="checkbox"> <span>Aracı aldığımdan beri yaptığım <strong>bütün AC/DC şarjları</strong> ve kWh değerleri kayıtlı</span></label>
+            <p class="muted">Bu kutuyu yalnızca kayıtlar eksiksizse işaretleyin. Başlangıç/güncel SOC, toplam mesafe ve şarj enerjisiyle <strong>yaklaşık enerji dengesi</strong> hesaplanır; şarj kaybı varsayımları ve bataryanın kullanılabilir kapasitesi sonucu etkiler. Geçmiş SOC ve km değerlerinin her şarjda bilinmesi gerekmez.</p>
+            <p id="energyBalanceDetail" class="muted" aria-live="polite"></p>
+          </details>
+        </article>
+        <article class="card quick-entry-card">
+          <div class="card-head"><h2>Güncel Araç Durumu</h2></div>
+          <form id="quickStatusForm" class="quick-status-form drive-quick-form">
+            <label>Kilometre<input id="quickCurrentOdo" type="number" min="0" step="1" inputmode="numeric" required></label>
+            <label>SOC (%)<input id="quickCurrentSoc" type="number" min="0" max="100" step="1" inputmode="numeric" required></label>
+            <label class="drive-optional">Bu sürüş ort. tüketimi (kWh/100 km) · isteğe bağlı<input id="quickDriveConsumption" type="number" min="0" max="100" step="0.1" inputmode="decimal" placeholder="Örn. 18,2 (sürüş bitişinde)"></label>
+            <label class="drive-optional">Son şarjdan beri araç ortalaması (kWh/100 km) · isteğe bağlı<input id="quickSinceCharge" type="number" min="0" max="100" step="0.1" inputmode="decimal" placeholder="Örn. 18,0 (araç ekranından)"></label>
+            <div class="drive-actions">
+              <button type="button" class="secondary" id="quickDriveStartBtn">Sürüşe Başla</button>
+              <button type="button" id="quickDriveEndBtn">Sürüşü Bitirdim</button>
+              <button type="submit" class="secondary">Yalnızca Durumu Güncelle</button>
+            </div>
+            <p id="driveStatusInfo" class="drive-status-info" aria-live="polite"></p>
+            <p class="muted drive-help">Son şarjdan beri ortalamayı biliyorsanız buraya girin; <strong>sahiplik dönemi toplam ortalamasını yazılım hesaplar</strong>. Bu sürüşün ortalaması ile son şarjdan beri sayacı farklı verilerdir.</p>
+            <p class="muted drive-help">Önerilen kullanım: Sürüşe başlarken bir kez <strong>Başla</strong>, park ettiğinizde <strong>Bitirdim</strong>. Yalnızca gün sonu kayıtları da kabul edilir; eksik aralıklar stres hesabına kesin bilgi gibi katılmaz.</p>
+          </form>
+        </article>
+      </div>
+      <details class="cockpit-more-metrics">
+        <summary><span>Diğer araç ve şarj göstergeleri</span><small>C-rate, maliyet, SOH, şarj dağılımı ve geçmiş</small></summary>
+        <div class="cards" id="dashboardCards"></div>
+      </details>
       <div class="grid two">
         <article class="card health-score-card">
           <div class="card-head"><h2>Kullanım Profili Skoru</h2><span id="healthConfidence" class="badge neutral"></span></div>
@@ -92,35 +134,6 @@
         <article class="card">
           <div class="card-head"><h2>Kümülatif Batarya Maruziyeti</h2><button class="link-btn" data-goto="stress">Detay</button></div>
           <div id="lifetimeExposureSummary"></div>
-        </article>
-      </div>
-      <div class="grid two">
-        <article class="card consumption-card">
-          <div class="card-head"><h2>Ortalama Tüketim</h2><button type="button" class="link-btn" onclick="document.getElementById('quickCurrentOdo').focus()">Hızlı Kayıt</button></div>
-          <div id="consumptionSummary"></div>
-          <details class="ledger-details">
-            <summary>Toplam tüketimi nasıl hesaplıyoruz?</summary>
-            <label class="checkbox-label"><input id="chargeLedgerComplete" type="checkbox"> <span>Aracı aldığımdan beri yaptığım <strong>bütün AC/DC şarjları</strong> ve kWh değerleri kayıtlı</span></label>
-            <p class="muted">Bu kutuyu yalnızca kayıtlar eksiksizse işaretleyin. Başlangıç/güncel SOC, toplam mesafe ve şarj enerjisiyle <strong>yaklaşık enerji dengesi</strong> hesaplanır; şarj kaybı varsayımları ve bataryanın kullanılabilir kapasitesi sonucu etkiler. Geçmiş SOC ve km değerlerinin her şarjda bilinmesi gerekmez.</p>
-            <p id="energyBalanceDetail" class="muted" aria-live="polite"></p>
-          </details>
-        </article>
-        <article class="card">
-          <div class="card-head"><h2>Güncel Araç Durumu</h2></div>
-          <form id="quickStatusForm" class="quick-status-form drive-quick-form">
-            <label>Kilometre<input id="quickCurrentOdo" type="number" min="0" step="1" inputmode="numeric" required></label>
-            <label>SOC (%)<input id="quickCurrentSoc" type="number" min="0" max="100" step="1" inputmode="numeric" required></label>
-            <label class="drive-optional">Bu sürüş ort. tüketimi (kWh/100 km) · isteğe bağlı<input id="quickDriveConsumption" type="number" min="0" max="100" step="0.1" inputmode="decimal" placeholder="Örn. 18,2 (sürüş bitişinde)"></label>
-            <label class="drive-optional">Son şarjdan beri araç ortalaması (kWh/100 km) · isteğe bağlı<input id="quickSinceCharge" type="number" min="0" max="100" step="0.1" inputmode="decimal" placeholder="Örn. 18,0 (araç ekranından)"></label>
-            <div class="drive-actions">
-              <button type="button" class="secondary" id="quickDriveStartBtn">Sürüşe Başla</button>
-              <button type="button" id="quickDriveEndBtn">Sürüşü Bitirdim</button>
-              <button type="submit" class="secondary">Yalnızca Durumu Güncelle</button>
-            </div>
-            <p id="driveStatusInfo" class="drive-status-info" aria-live="polite"></p>
-            <p class="muted drive-help">Son şarjdan beri ortalamayı biliyorsanız buraya girin; <strong>sahiplik dönemi toplam ortalamasını yazılım hesaplar</strong>. Bu sürüşün ortalaması ile son şarjdan beri sayacı farklı verilerdir.</p>
-            <p class="muted drive-help">Önerilen kullanım: Sürüşe başlarken bir kez <strong>Başla</strong>, park ettiğinizde <strong>Bitirdim</strong>. Yalnızca gün sonu kayıtları da kabul edilir; eksik aralıklar stres hesabına kesin bilgi gibi katılmaz.</p>
-          </form>
         </article>
       </div>
       <div class="grid two">
@@ -661,7 +674,7 @@
     </section>
   </main>
 
-  <footer>v0.9.6 · Premium / Apple · Charge Planner · Engineer Edition · Tek kullanıcı giriş kapısı · Firebase Sync · GitHub Pages · iPhone uyumlu · km/SOC eksik geçmiş kayıt desteği · süre→ortalama güç/C-rate</footer>
+  <footer>v0.9.7 · Akıllı Araç Paneli · Engineer Edition · Tek kullanıcı giriş kapısı · Firebase Sync · GitHub Pages · iPhone uyumlu · km/SOC eksik geçmiş kayıt desteği · süre→ortalama güç/C-rate</footer>
   </div>
 
   <script src="weather.js"></script>

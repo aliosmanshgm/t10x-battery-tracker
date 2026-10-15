@@ -1,4 +1,4 @@
-# Firebase + GitHub Pages Kurulum Kontrol Listesi — v0.9.6
+# Firebase + GitHub Pages Kurulum Kontrol Listesi — v0.9.7
 
 ## 1. Tamamlananlar
 - Firebase projesi: `t10x-battery-tracker`
@@ -107,3 +107,11 @@ GitHub'a v0.9.6 dosyalarını yükledikten sonra önceki service worker önbelle
 5. İlk açılışta **SOH Testleri → Veri Türü** menüsünü kontrol edin. Şarj kaybını bilmiyorsanız boş bırakın.
 6. iPhone Safari eski dosyaları gösterirse uygulamayı tamamen kapatıp yeniden açın. Firebase oturumunu ve eski kayıtların yerinde olduğunu doğrulayın.
 7. `TEKNIK_DENETIM_NOTLARI.md` bulgularını ve halen kalibre edilmemiş modelleri okuyun.
+
+
+## v0.9.7 yayın notu
+
+- Eski v0.9.6 dosyalarını, yeni ZIP'teki **bütün** uygulama dosyalarıyla değiştirin. `range-model.js` yeni SOC/km–tüketim kıyaslama mantığını içerir; `app.js` + `index.html` + `app.css` birlikte güncellenmelidir.
+- Firebase Auth kimliği/kuralları değiştirilmez. Veri şeması v15 kalır. JSON yedeğini yayımlamadan önce alın.
+- Panel canlı OBD verisi göstermiyor. Rakamlar girişlerinizden veya açıkça işaretli hesaplamalardan geliyor.
+- Ekranda eski sürüm görünürse iPhone'da Safari/ana ekrana ekli web uygulamasını kapatıp yeniden açın; `sw.js` cache `t10x-battery-v0.9.7-cockpit`.
