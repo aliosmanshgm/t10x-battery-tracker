@@ -76,3 +76,13 @@
 - Son 90 gün görünümü: tarihli tamamlanmış sürüşler, tarihli manuel yolculuklar ve tarihi uygun son tüketim kaydı; sahiplik dönemi enerji dengesi dışarıda. Birbirine karışan dönemlerin yanlış karşılaştırılmasını önler.
 - Son sürüş tarihi görünür; dönem veri olmadan sonuç uydurmuyor.
 - Mevcut kayıtlar, şema (15), servis işçisi kapsamı ve Firebase tek kullanıcı güvenliği korunuyor.
+
+
+## v0.9.9 — Mevsimsel menzil metodoloji notu
+
+- Meteorolojik mevsimler Türkiye yerel takvimi (Europe/Istanbul) ile sınıflandırılır. Yaz 6–8. aylar, kış 12/1/2. aylar. Diğer aylar dışarıda kalır.
+- Sıcaklık görünümü mevsimle karıştırılmaz: gerçek dış hava ölçümü ≤10 °C veya ≥25 °C. Mevcut kayıtlarda temp yoksa sınıflandırılmaz; online hava sorgusu yapılıp eski veri icat edilmez.
+- SOC kilometre menzili: 100 × Σkm / ΣSOC düşüşü. Her segment için en az 30 km ve 8 SOC puanı; 100–1000 km fiziksel-makul filtre. Tarih belli, sürüş süreleri uygun, arada bilinen şarj olmayan kayıtlar kullanılır. Elle girilen tarihsiz/şarjı belirsiz yolculuk sınırlamalarına dikkat.
+- İkinci yöntem: Sürüşe özgü tüketimin Σ(kWh) / Σkm ağırlıklı ortalaması. İstasyondan alınan kWh, son şarj sayacı veya sahiplik ortalaması mevsimsel tüketim diye kullanılmaz. Kapasite bilinmiyorsa 88,5 kWh nominal varsayımı yalnız kaba menzil senaryosudur.
+- **Kıyaslama şartları:** Her iki grupta aynı yöntem, en az 2 sürüş ve ≥100 km; SOC için toplam ≥20 SOC puanı. Yalnız tek taraf yeterliyse mevsim farkı gösterilmez. Birden fazla sezonda bulunan eski-yeni kayıtlar toplu karşılaştırmadır; eşleştirilmiş koşul araştırması değildir.
+- Sonuçlar araç/batarya sağlık testi değildir. Ortam sıcaklığı pack/hücre sıcaklığı değildir; lastik, hız, tırmanış, rüzgar, klima, lastik ve sürüş profili karıştırıcı değişkenlerdir.

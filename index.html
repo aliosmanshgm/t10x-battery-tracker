@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="T10X Batarya" />
   <meta name="mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="manifest.webmanifest" />
-  <title>T10X Batarya & Şarj Takip v0.9.8 · Tahmini Menzil</title>
+  <title>T10X Batarya & Şarj Takip v0.9.9 · Yaz/Kış Menzil</title>
   <link rel="stylesheet" href="app.css" />
 </head>
 <body>
@@ -73,6 +73,7 @@
         <div class="cockpit-source-line"><span><i></i> Kayıtlı bilgiler</span><span id="cockpitLastUpdate">Son giriş: —</span><span>OBD verisi bağlı değil</span></div>
       </section>
       <article class="card range-dashboard-card" id="rangeDashboard" aria-live="polite"></article>
+      <article class="card seasonal-dashboard-card" id="seasonalRangeDashboard" aria-live="polite"></article>
       <div class="grid two">
         <article class="card consumption-card">
           <div class="card-head"><h2>Ortalama Tüketim</h2><button type="button" class="link-btn" onclick="document.getElementById('quickCurrentOdo').focus()">Hızlı Kayıt</button></div>
@@ -90,6 +91,8 @@
             <label>Kilometre<input id="quickCurrentOdo" type="number" min="0" step="1" inputmode="numeric" required></label>
             <label>SOC (%)<input id="quickCurrentSoc" type="number" min="0" max="100" step="1" inputmode="numeric" required></label>
             <label class="drive-optional">Bu sürüş ort. tüketimi (kWh/100 km) · isteğe bağlı<input id="quickDriveConsumption" type="number" min="0" max="100" step="0.1" inputmode="decimal" placeholder="Örn. 18,2 (sürüş bitişinde)"></label>
+            <label class="drive-optional">Sürüş bitişindeki dış hava sıcaklığı (°C) · isteğe bağlı<input id="quickDriveTemp" type="number" min="-50" max="60" step="0.1" inputmode="decimal" placeholder="Örn. 5,0"></label>
+            <div class="drive-weather-action"><button type="button" class="secondary" id="quickDriveWeatherBtn">Konumdan Sıcaklık Al</button><small id="quickDriveWeatherStatus">Yalnız sürüş sonu dış hava ölçümü. Batarya sıcaklığı değildir; koordinat kaydedilmez.</small></div>
             <label class="drive-optional">Son şarjdan beri araç ortalaması (kWh/100 km) · isteğe bağlı<input id="quickSinceCharge" type="number" min="0" max="100" step="0.1" inputmode="decimal" placeholder="Örn. 18,0 (araç ekranından)"></label>
             <div class="drive-actions">
               <button type="button" class="secondary" id="quickDriveStartBtn">Sürüşe Başla</button>
@@ -674,7 +677,7 @@
     </section>
   </main>
 
-  <footer>v0.9.8 · Tahmini Menzil · Engineer Edition · Tek kullanıcı giriş kapısı · Firebase Sync · GitHub Pages · iPhone uyumlu · km/SOC eksik geçmiş kayıt desteği · süre→ortalama güç/C-rate</footer>
+  <footer>v0.9.9 · Yaz/Kış Menzil · Engineer Edition · Tek kullanıcı giriş kapısı · Firebase Sync · GitHub Pages · iPhone uyumlu · km/SOC eksik geçmiş kayıt desteği · süre→ortalama güç/C-rate</footer>
   </div>
 
   <script src="weather.js"></script>
@@ -682,6 +685,7 @@
   <script src="consumption-model.js"></script>
   <script src="soh-model.js"></script>
   <script src="range-model.js"></script>
+  <script src="seasonal-range.js"></script>
   <script src="app.js"></script>
   <script type="module" src="firebase-sync.js"></script>
   <script>

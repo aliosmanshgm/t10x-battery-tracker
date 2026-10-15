@@ -1,4 +1,4 @@
-# Firebase + GitHub Pages Kurulum Kontrol Listesi — v0.9.8
+# Firebase + GitHub Pages Kurulum Kontrol Listesi — v0.9.9
 
 ## 1. Tamamlananlar
 - Firebase projesi: `t10x-battery-tracker`
@@ -120,3 +120,13 @@ GitHub'a v0.9.6 dosyalarını yükledikten sonra önceki service worker önbelle
 ## v0.9.8 güncellemesi
 
 Önce uygulamanızdan JSON yedeği alın. ZIP içindeki bütün dosyaları GitHub depo köküne yükleyin (`range-model.js`, `app.js`, `app.css`, `index.html`, `sw.js` birlikte). Veri şeması, Firebase yapılandırması ve tek kullanıcı kuralları değişmedi. Safari ana ekran uygulamasında eski kart görünürse uygulamayı yeniden açın. Son 90 gün düğmesi yalnızca menzil görünümünü filtreler, Firebase'e yazmaz.
+
+
+## v0.9.9 Yaz/Kış Menzil geçişi
+
+1. GitHub'a dosya yüklemeden önce çalışan uygulamanızdan **JSON Yedekle** kullanın.
+2. Bu ZIP içindeki **bütün** dosyaları depo köküne aktarın; özellikle yeni `seasonal-range.js` olmadan app.js'deki yeni kart açılamaz.
+3. Sayfayı tekrar açıp Dashboard > **Yaz / Kış Menzil Analizi** kartını ve **Sıcak / Soğuk Hava** düğmesini deneyin.
+4. Eski cihaz önbelleği kalırsa iPhone Safari/PWA'yı tamamen kapatıp yeniden açın. Güncel cache: `t10x-battery-v0.9.9-seasonal-range`.
+5. Yeni veriler eski Firebase nesnelerine opsiyonel `temp`, `tempSource`, `tempObservedAt` alanları olarak eklenir. Veri şeması **15** değişmez ve Firebase güvenlik kuralları aynı kalır.
+6. Konum izni yalnızca açıkça “Konumdan Sıcaklık Al” düğmesi seçilince istenir. Koordinatlar DB'ye yazılmaz. Dış hava sıcaklığı batarya sıcaklığı değildir.

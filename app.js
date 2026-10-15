@@ -183,7 +183,7 @@ const domIds=[
   'plannerForm','plannerCurrentSoc','plannerDistance','plannerConsumption','plannerReserveSoc','plannerMargin','plannerDeparture','plannerChargeType','plannerPower','plannerAmbientTemp','plannerParking','plannerParkHours','plannerPreDriveMin','plannerWeatherBtn','plannerWeatherStatus','plannerResult','plannerBadge','plannerThermal','plannerWeatherDetail','plannerMgmLink',
   'crateForm','crateCapacity','cratePower','crateStartSoc','crateEndSoc','crateTemp',
   'settingsForm','vehicleName','batteryChemistry','ownershipStartOdo','ownershipStartSoc','ownershipStartDate','trackingStartOdo','currentOdo','currentSoc','referenceCapacity','wltpRangeKm','preferredMinSoc','preferredMaxSoc','stressWindow','plannerReserveDefault','plannerMarginDefault','mgmCity','clearAllBtn',
-  'chargeLedgerComplete','energyBalanceDetail','batteryUsableCapacity','acChargeEfficiency','dcChargeEfficiency','quickStatusForm','quickCurrentOdo','quickCurrentSoc','quickSinceCharge','quickDriveConsumption','quickDriveStartBtn','quickDriveEndBtn','driveStatusInfo','providerNew','providerAddBtn','providerResetBtn','providerManager',
+  'chargeLedgerComplete','energyBalanceDetail','batteryUsableCapacity','acChargeEfficiency','dcChargeEfficiency','quickStatusForm','quickCurrentOdo','quickCurrentSoc','quickSinceCharge','quickDriveConsumption','quickDriveTemp','quickDriveWeatherBtn','quickDriveWeatherStatus','quickDriveStartBtn','quickDriveEndBtn','driveStatusInfo','providerNew','providerAddBtn','providerResetBtn','providerManager',
   'exportJsonBtn','importJsonInput','exportChargesCsv','exportConsumptionCsv','exportTripsCsv','exportDriveSessionsCsv'
 ];
 const D=Object.fromEntries(domIds.map(id=>[id,byId(id)]));
@@ -598,6 +598,7 @@ function renderBarsOrdered(id,obj,suffix=''){const el=byId(id),entries=Object.en
 
 // The view selection changes only the Dashboard presentation; it is never saved to Firebase.
 let rangePeriodView = 'all';
+let seasonalRangeView = 'calendar';
 function isInLastDays(value, days, now = Date.now()){
   const stamp=Date.parse(value||'');
   return Number.isFinite(stamp) && stamp <= now && stamp >= now - days*86400000;
@@ -680,6 +681,50 @@ function renderDashboard(){
       <p><strong>Son 90 gün görünümü:</strong> Tarihli sürüşler ve son şarjdan beri tüketim sayacı dikkate alınır. Ömür boyu enerji dengesi veya tarih atanmamış eski yolculuklar bu döneme dahil edilmez. Dönemler arasında yalnızca farklı örneklemler karşılaştırılır.</p>
       <p><strong>Güncel rezerv:</strong> %100 eşdeğeri × (güncel SOC − seçilen rezerv)/100. %20–80 bandı %60'ıdır. Bu menzil güvenli erişim garantisi değildir. Gelecekteki sıcaklık, hız, eğim, klima ve beklenmedik tüketim sonucu değiştirebilir.</p>
       <p><strong>WLTP karşılaştırması:</strong> 523 km, standart test çevriminin referansıdır. Yüzde farkı bataryanın SOH/kaybı anlamına gelmez. Araçtan canlı OBD verisi veya kullanılabilir kapasite otomatik alınmaz.</p>
+    </details>`;
+
+  // v0.9.9: calendar seasons and actual ambient-temperature bands remain distinct.
+  const seasonal=window.T10XSeasonalRange.analyze({
+    driveSessions:db.driveSessions,trips:db.trips,charges:ownerCharges(),
+    nominalCapacity:db.settings.referenceCapacity,usableCapacity:db.settings.batteryUsableCapacity,
+    view:seasonalRangeView
+  });
+  const seasonalCard=(group,label,emoji)=>{
+    const x=seasonal[group];
+    const rangeValue=x.range==null?'—':fmt(x.range,0)+' km';
+    const basis=x.primary==='soc'?'Km / SOC gözlemi':x.primary==='consumption'
+      ?(x.capacityBasis==='nominal-assumption'?'Tüketim + nominal kapasite (kaba)':'Tüketim + girilmiş kapasite'):'Henüz ölçüm yok';
+    const enough=x.primary==='soc'?x.socAdequate:x.consAdequate;
+    const status=x.range==null?'Veri bekleniyor':enough?'Kıyaslanabilir örnek':'Ön gözlem · az veri';
+    const stats=[];
+    if(x.socCount)stats.push(`${x.socCount} SOC/km sürüşü · ${fmt(x.socKm,0)} km · %${fmt(x.socDrop,0)} SOC`);
+    if(x.consumptionCount)stats.push(`${x.consumptionCount} tüketim kaydı · ${fmt(x.consumptionKm,0)} km · ${fmt(x.consumptionAverage,1)} kWh/100 km`);
+    const t=x.avgTemp!=null?`Dış hava: ort. ${fmt(x.avgTemp,1)}°C · ${x.temperatureRecordCount} veri`:'Dış hava sıcaklığı: kayıt yok';
+    return `<div class="season-item ${group}"><div class="season-top"><span>${emoji} ${label}</span><span class="season-status">${escapeHtml(status)}</span></div>
+      <strong class="season-km">${rangeValue}</strong><span class="season-basis">${escapeHtml(basis)}</span>
+      <div class="season-sub">${stats.length?stats.map(z=>escapeHtml(z)).join('<br>'):'Kayıtlı ve uygun sürüş henüz yok.'}<br>${escapeHtml(t)}</div></div>`;
+  };
+  const sComp=seasonal.comparison;
+  const sDelta=sComp.ready?`<strong>${sComp.differenceKm>=0?'+':'−'}${fmt(Math.abs(sComp.differenceKm),0)} km</strong>
+    <span>Yaz / sıcak koşul − kış / soğuk koşul · Yaz değerine göre ${sComp.differencePct>=0?'+':'−'}%${fmt(Math.abs(sComp.differencePct),1)}</span>`:
+    '<strong>Henüz karşılaştırılamıyor</strong><span>Her iki grupta da aynı yöntemle yeterli örnek gerekli.</span>';
+  const sSummary=sComp.ready?(sComp.method==='soc'?'Yalnızca km/SOC sürüşlerinin karşılaştırması. %100 SOC eşdeğeri, gerçek tam şarj testi değildir.':
+    `Tüketim üzerinden karşılaştırma. ${sComp.nominalAssumption?'88,5 kWh nominal kapasite yalnızca kaba mutlak menzil varsayımıdır; bağıl tüketim farkı kapasiteden bağımsızdır.':'Girilen kullanılabilir kapasiteye bağlıdır.'}`):
+    'Fark hesaplamak için her grupta en az 2 sürüş ve ≥100 km gerekir. SOC yöntemi için ayrıca toplam ≥20 SOC puanlık düşüş gerekir. Karışık yöntemlerle fark hesaplanmaz.';
+  byId('seasonalRangeDashboard').innerHTML=`<div class="card-head range-title-head"><div><span class="cockpit-eyebrow">KİŞİSEL SÜRÜŞ KAYITLARI</span><h2>Yaz / Kış Menzil Analizi</h2></div><span class="badge neutral">${seasonal.view==='calendar'?'Takvim':'Gerçek sıcaklık'}</span></div>
+    <div class="season-controls" role="group" aria-label="Mevsimsel analiz yöntemi">
+      <button type="button" data-season-view="calendar" class="season-switch ${seasonalRangeView==='calendar'?'active':''}" aria-pressed="${seasonalRangeView==='calendar'}">Yaz / Kış</button>
+      <button type="button" data-season-view="temperature" class="season-switch ${seasonalRangeView==='temperature'?'active':''}" aria-pressed="${seasonalRangeView==='temperature'}">Sıcak / Soğuk Hava</button>
+    </div>
+    <p class="season-note">${escapeHtml(seasonal.note)}</p>
+    <div class="season-grid">${seasonalCard('summer',seasonal.view==='calendar'?'Yaz · Haz–Ağu':'Sıcak · ≥25°C','☀️')}${seasonalCard('winter',seasonal.view==='calendar'?'Kış · Ara–Şub':'Soğuk · ≤10°C','❄️')}</div>
+    <div class="season-difference"><span>Karşılaştırma sonucu</span>${sDelta}</div>
+    <p class="season-note">${escapeHtml(sSummary)}</p>
+    <details class="range-details"><summary>Hangi kayıtlar kullanılır? Bilimsel sınırlar</summary>
+      <p>Dashboard'daki <strong>Sürüşe Başla / Sürüşü Bitirdim</strong> kayıtları ve elle girilmiş, mükerrer olmayan sürüşler kullanılır. Şarjın araya girdiği zaman damgalı sürüşler SOC/km hesabından çıkarılır; ≥30 km, ≥8 SOC puanı ve makul menzil kontrolü uygulanır.</p>
+      <p>Sürüş başına kaydedilmiş tüketim (kWh/100 km) varsa ayrı değerlendirilir. Yalnızca son şarjdan beri sayaç kaydı, tarihli bir sürüşün enerji tüketimi sanılmaz. Tüketimden mutlak menzil hesaplamak için kullanılabilir kapasite gerekir; yalnız nominal 88,5 kWh varsa kaba senaryo gösterilir.</p>
+      <p>Takvim görünümü mevsimi tarihten belirler. Sıcaklık görünümü yalnızca sürüş için kaydedilmiş <strong>dış hava</strong> sıcaklığını kullanır; eksik sıcaklık otomatik doldurulmaz ve dış hava batarya sıcaklığı değildir.</p>
+      <p>Fark hız, yol eğimi, klima, lastik, rüzgar ve rota değişiminden de kaynaklanabilir; batarya SOH kaybı olarak yorumlanamaz. Sürüş/SOC ve tüketim aynı yolculuğa ait olabileceğinden iki yöntem bağımsız doğrulama değildir.</p>
     </details>`;
 
   const odoText=latestOdo()!=null?fmt(latestOdo(),0)+' km':'—';
@@ -1171,10 +1216,28 @@ D.quickDriveStartBtn.addEventListener('click',()=>{
   captureQuickSinceCharge(v.odo,startAt);
   save();
 });
+D.quickDriveTemp?.addEventListener('input',()=>{
+  D.quickDriveTemp.dataset.source='manual';
+  D.quickDriveTemp.dataset.observedAt='';
+  D.quickDriveWeatherStatus.textContent='Sürüş sonundaki manuel dış hava sıcaklığı. Batarya sıcaklığı değildir.';
+});
+D.quickDriveWeatherBtn?.addEventListener('click',async()=>{
+  if(!window.T10XWeather)return alert('Hava servisi yüklenemedi.');
+  D.quickDriveWeatherBtn.disabled=true;D.quickDriveWeatherStatus.textContent='Konum izni / sıcaklık verisi bekleniyor…';
+  try{
+    const w=await window.T10XWeather.currentFromLocation();
+    D.quickDriveTemp.value=w.temperature.toFixed(1);
+    D.quickDriveTemp.dataset.source='open-meteo';D.quickDriveTemp.dataset.observedAt=w.observedAt||new Date().toISOString();
+    D.quickDriveWeatherStatus.textContent=`Open-Meteo · ${fmt(w.temperature,1)}°C · anlık dış hava; koordinat kaydedilmedi.`;
+  }catch(e){D.quickDriveWeatherStatus.textContent='Hava verisi alınamadı: '+e.message;}
+  finally{D.quickDriveWeatherBtn.disabled=false;}
+});
 D.quickDriveEndBtn.addEventListener('click',()=>{
   const v=quickReading();if(!v)return;
   const start=db.activeDrive;
   const consumption=D.quickDriveConsumption.value===''?null:Number(D.quickDriveConsumption.value);
+  const ambientTemp=D.quickDriveTemp.value===''?null:Number(D.quickDriveTemp.value);
+  if(ambientTemp!==null&&(!Number.isFinite(ambientTemp)||ambientTemp< -50||ambientTemp>60))return alert('Dış hava sıcaklığını kontrol edin.');
   if(consumption!==null&&(!(consumption>0)||consumption>100))return alert('Tüketim değerini kontrol edin (kWh/100 km).');
   if(start){
     if(v.odo<start.startOdo)return alert('Bitiş km, sürüş başlangıcından küçük olamaz.');
@@ -1185,15 +1248,17 @@ D.quickDriveEndBtn.addEventListener('click',()=>{
   }
   const newSessionId=start?.id||uid();
   const endAt=recordCurrent(v.odo,v.soc,start?'drive_end':'drive_end_unpaired',{sessionId:newSessionId});
-  const drive={id:newSessionId,startAt:start?.startAt||null,endAt,startOdo:start?.startOdo??null,endOdo:v.odo,startSoc:start?.startSoc??null,endSoc:v.soc,distance:start?Math.max(0,v.odo-start.startOdo):null,consumption,complete:!!start};
+  const drive={id:newSessionId,startAt:start?.startAt||null,endAt,startOdo:start?.startOdo??null,endOdo:v.odo,startSoc:start?.startSoc??null,endSoc:v.soc,distance:start?Math.max(0,v.odo-start.startOdo):null,consumption,temp:ambientTemp,
+    tempSource:ambientTemp===null?null:(D.quickDriveTemp.dataset.source||'manual'),
+    tempObservedAt:D.quickDriveTemp.dataset.observedAt||null,complete:!!start};
   db.driveSessions.push(drive);
   captureQuickSinceCharge(v.odo,endAt);
   if(start&&drive.distance>0&&consumption!=null){
     // Trip consumption is a trip metric, NOT the vehicle's "since last charge" counter.
     const ended=new Date(endAt),tripDay=new Date(ended.getTime()-ended.getTimezoneOffset()*60000).toISOString().slice(0,10);
-    db.trips.push({id:uid(),date:tripDay,distance:drive.distance,consumption,startSoc:start.startSoc,endSoc:v.soc,temp:null,route:'Dashboard · Sürüş kaydı',notes:'Sürüş/park hızlı girişi',linkedDriveId:drive.id});
+    db.trips.push({id:uid(),date:tripDay,distance:drive.distance,consumption,startSoc:start.startSoc,endSoc:v.soc,temp:ambientTemp,route:'Dashboard · Sürüş kaydı',notes:'Sürüş/park hızlı girişi',linkedDriveId:drive.id});
   }
-  db.activeDrive=null;D.quickDriveConsumption.value='';save();
+  db.activeDrive=null;D.quickDriveConsumption.value='';D.quickDriveTemp.value='';D.quickDriveTemp.dataset.source='manual';D.quickDriveTemp.dataset.observedAt='';D.quickDriveWeatherStatus.textContent='İsteğe bağlı: sürüş sonunda güncel dış hava sıcaklığı girin veya konumdan alın.';save();
   if(!start)alert('Sürüş bitişi ve park başlangıcı kaydedildi. Başlangıç bilinmediğinden bu yolculuğun tüketimi/mesafesi hesaplanmadı.');
 });
 window.deleteDriveSession=id=>{
@@ -1220,6 +1285,12 @@ byId('rangeDashboard').addEventListener('click',e=>{
   const next=button.dataset.rangePeriod;
   if(next!=='all'&&next!=='recent')return;
   if(rangePeriodView!==next){rangePeriodView=next;renderDashboard();}
+});
+byId('seasonalRangeDashboard').addEventListener('click',e=>{
+  const b=e.target.closest('button[data-season-view]');
+  if(!b||!byId('seasonalRangeDashboard').contains(b))return;
+  if(b.dataset.seasonView!=='calendar'&&b.dataset.seasonView!=='temperature')return;
+  if(seasonalRangeView!==b.dataset.seasonView){seasonalRangeView=b.dataset.seasonView;renderDashboard();}
 });
 byId('jumpToQuickStatus').onclick=()=>{showTab('dashboard');byId('quickCurrentOdo').scrollIntoView({behavior:'smooth',block:'center'});byId('quickCurrentOdo').focus({preventScroll:true});};document.querySelectorAll('[data-goto]').forEach(b=>b.onclick=()=>showTab(b.dataset.goto));
 

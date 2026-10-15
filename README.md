@@ -1,4 +1,4 @@
-# T10X Batarya & Şarj Takip v0.9.8 — Tahmini Menzil & Dönem Karşılaştırması
+# T10X Batarya & Şarj Takip v0.9.9 — Yaz/Kış Menzil Analizi
 
 Kişisel T10X (88,5 kWh NMC) kullanımı için local-first + Firebase senkronizasyonlu, iPhone/PWA uyumlu batarya ve şarj takip uygulaması.
 
@@ -34,7 +34,7 @@ Ana veri kümeleri:
 - `socSnapshots`
 - `meta`
 
-Şema sürümü: **13**. Eski local veriler otomatik migrate edilir.
+Şema sürümü: **15**. Eski local veriler otomatik migrate edilir.
 
 ## Güvenlik
 
@@ -184,3 +184,24 @@ v0.9.6 paketindeki **yeni `range-model.js`** dahil tüm dosyaları GitHub Pages 
 - Yeni veri alanı yoktur; eski Firebase kayıtları ve güvenlik kuralları korunur. Service worker cache: `t10x-battery-v0.9.8-range-clarity`.
 
 **Bilimsel not:** SOC/km menzili araç SOC göstergesine göre doğrusal %100 eşdeğeridir. Tüketim + nominal 88,5 kWh hesabı kullanılabilir kapasiteyi ölçmez. İki yöntemin ortak kaydı kullanması sebebiyle birleşik değer bağımsız doğrulama sayılmaz. Düşük sıcaklık/yüksek hız, WLTP farkı ve batarya yıpranması birbirinden ayrılmalıdır.
+
+
+## v0.9.9 — Yaz / Kış Menzil Analizi (15 Ekim 2026)
+
+- Dashboard'da yeni **Yaz / Kış Menzil Analizi** kartı: haziran–ağustos / aralık–şubat dönemlerinde kayıtlı kilometre-SOC sürüşlerinin tahmini %100 eşdeğer menzili. İlkbahar ve sonbahar ayrı dönemdir, kıyaslamaya katılmaz.
+- İkinci görünüm **Sıcak / Soğuk Hava**: yalnızca sürüş sonundaki **gerçekten kaydedilmiş dış hava sıcaklığına** göre ≥25 °C ile ≤10 °C karşılaştırılır. Geçmiş sıcaklık uydurulmaz, ortam değeri BMS batarya sıcaklığı değildir.
+- **Veri yeterliliği:** her grupta en az iki bağımsız sürüş ve ≥100 km; SOC/km yöntemi için ayrıca ≥20 SOC puanlık düşüş varsa aynı yöntemle mevsim farkı gösterilir. Yetersiz veri için ön gözlem olabilir; **yüzdelik kıyas üretilmez**.
+- Kaynağı doğrudan sürüş olan km + SOC önceliklidir. Tarihli sürüşe özgü tüketim varsa ayrı değerlendirilir (mesafe ağırlıklı); yalnızca sahiplik ortalaması, şarj kWh toplamı ve son şarjdan beri sayaç **mevsimsel sürüş olarak sınıflandırılmaz**.
+- Mevcut ve geçmiş `driveSessions`, `trips`, `charges` kayıtları korunur. Dashboard'un **Sürüşü Bitirdim** alanına opsiyonel dış hava sıcaklığı + konumdan anlık Open-Meteo sıcaklığı eklendi. Koordinat Firebase'e yazılmaz. Dış hava kaynağı ve gözlem zamanı kaydedilir.
+- Sürüşün ortalama tüketimi girilmişse önceki gibi bağlantılı ayrıntılı sürüş oluşturulur; mevsimsel hesapta bu otomatik bağlantı çift sayılmaz.
+- Yeni modül `seasonal-range.js`, 18 senaryo testi `tests/seasonal-range.test.js`, SW cache `t10x-battery-v0.9.9-seasonal-range`.
+- Veri şeması **15** değişmedi; Firebase UID güvenliği ve mevcut JSON yedekleri korunur.
+
+### Kullanım
+
+1. Sürüşü Dashboard'dan başlatın; bitirirken kilometre ve SOC'yi güncelleyin.
+2. İsterseniz sürüş sonundaki **dış hava sıcaklığını** elle girin ya da “Konumdan Sıcaklık Al” düğmesine dokunun.
+3. **Yaz/Kış** kartı yeterli kayıt biriktikçe hesaplanır; **Sıcak/Soğuk Hava** görünümü yalnızca sıcaklık kaydı olan sürüşleri kapsar.
+4. Karttaki değerler gerçek %100 menzil testi veya SOH ölçümü değildir. Rota/hız/klima/ısıtma/lastik vb. etkiler ayrıştırılmadığı için mevsimler arası fark nedensel bir batarya ölçümü sayılamaz.
+
+**Kurulum:** v0.9.9 ZIP içindeki bütün uygulama dosyalarını (`seasonal-range.js` dahil) GitHub Pages kök dizinine yükleyin. Öncesinde JSON yedeği alın. `database.rules.json` güncellemesi gerekmez.

@@ -40,7 +40,7 @@
       if (kmFromOdo !== null && km !== null && Math.abs(kmFromOdo - km) > Math.max(3, km * 0.05)) continue;
       if (hasChargeInside(start, end, charges)) continue;
       const segment = eligibleSegment(kmFromOdo !== null ? kmFromOdo : km, d.startSoc, d.endSoc);
-      if (segment) segments.push({ ...segment, observedAt:d.endAt });
+      if (segment) segments.push({ ...segment, observedAt:d.endAt, id:d.id, temp:d.temp??null });
     }
     return segments;
   }
@@ -51,7 +51,7 @@
       // Dashboard-generated trips are already counted in driveSessions.
       if (t.linkedDriveId) continue; // Other manual trips rely on user-entered start/end SOC; interim charging cannot be verified without timestamps.
       const segment = eligibleSegment(t.distance, t.startSoc, t.endSoc);
-      if (segment) segments.push({ ...segment, observedAt:t.date||null });
+      if (segment) segments.push({ ...segment, observedAt:t.date||null, id:t.id, temp:t.temp??null });
     }
     return segments;
   }
